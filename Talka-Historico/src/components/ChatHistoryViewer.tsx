@@ -44,6 +44,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [conversationsPerPage] = useState(10);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Função para extrair nome da empresa do username
@@ -597,11 +599,30 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   }, []);
 
   const filteredConversations = useMemo(() => 
-    conversations.filter(conv =>
-      conv.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conv.participants.some(p => p.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      conv.messages.some(m => m.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    ), [conversations, searchTerm]);
+    conversations.filter(conv => {
+      if (!conv) return false;
+      
+      const titleMatch = conv.title?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+      const participantsMatch = conv.participants?.some(p => 
+        p?.toLowerCase().includes(searchTerm.toLowerCase())
+      ) || false;
+      const messagesMatch = conv.messages?.some(m => 
+        m?.content?.toLowerCase().includes(searchTerm.toLowerCase())
+      ) || false;
+      
+      return titleMatch || participantsMatch || messagesMatch;
+    }), [conversations, searchTerm]);
+
+  // Paginação
+  const totalPages = Math.ceil(filteredConversations.length / conversationsPerPage);
+  const startIndex = (currentPage - 1) * conversationsPerPage;
+  const endIndex = startIndex + conversationsPerPage;
+  const currentConversations = filteredConversations.slice(startIndex, endIndex);
+
+  // Reset página quando filtro muda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const formatTimestamp = useCallback((timestamp: string) => {
     return new Date(timestamp).toLocaleString('pt-BR');
@@ -658,6 +679,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             </h2>
                             <p className="text-purple-200 text-sm">
                                 {conversations.length} conversa{conversations.length !== 1 ? 's' : ''} disponível{conversations.length !== 1 ? 'eis' : ''}
+                                {searchTerm && ` • ${filteredConversations.length} filtrada${filteredConversations.length !== 1 ? 's' : ''}`}
                             </p>
                         </div>
                     </div>
@@ -727,7 +749,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 </p>
                             </div>
                         </div>
-                    ) : filteredConversations.map((conversation) => (
+                    ) : currentConversations.map((conversation) => (
                     <Card
                         key={conversation.id}
                         className={`p-4 mb-2 cursor-pointer transition-all hover:shadow-md border-purple-600/30 bg-purple-800/20 hover:bg-purple-700/30 ${
@@ -738,13 +760,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         onClick={() => setSelectedConversation(conversation)}
                     >
                         <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-sm truncate flex-1 text-white">{conversation.title}</h3>
+                        <h3 className="font-medium text-sm truncate flex-1 text-white">
+                            {conversation.title || 'Conversa sem título'}
+                        </h3>
                         <span className="text-xs text-purple-300 ml-2">
-                            {formatTimestamp(conversation.lastTimestamp).split(' ')[0]}
+                            {conversation.lastTimestamp ? formatTimestamp(conversation.lastTimestamp).split(' ')[0] : 'Data inválida'}
                         </span>
                         </div>
                         <p className="text-xs text-purple-200 mb-2 truncate">
-                        {conversation.lastMessage}
+                        {conversation.lastMessage || 'Nenhuma mensagem'}
                         </p>
                         <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -754,7 +778,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             </Badge>
                             <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-200">
                             <MessageCircle className="w-3 h-3 mr-1" />
-                            {conversation.messageCount || 0}
+                            {conversation.messageCount || conversation.messages?.length || 0}
                             </Badge>
                         </div>
                         </div>
@@ -768,7 +792,49 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         <p className="text-sm text-purple-300">Importe um arquivo CSV para começar</p>
                     </div>
                     )}
+                    
+                    {!isFetching && filteredConversations.length === 0 && conversations.length > 0 && (
+                    <div className="text-center py-8 text-purple-300">
+                        <Search className="w-12 h-12 mx-auto mb-4 opacity-50 text-purple-400" />
+                        <p className="text-white">Nenhuma conversa encontrada</p>
+                        <p className="text-sm text-purple-300">Tente pesquisar com outros termos</p>
+                    </div>
+                    )}
                 </div>
+                
+                {/* Paginação */}
+                {totalPages > 1 && (
+                  <div className="p-4 border-t border-purple-600/30">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-purple-300">
+                        Página {currentPage} de {totalPages} • {filteredConversations.length} conversas
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          variant="outline"
+                          size="sm"
+                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
+                        >
+                          ←
+                        </Button>
+                        <span className="text-xs text-purple-200 px-2">
+                          {currentPage}
+                        </span>
+                        <Button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          variant="outline"
+                          size="sm"
+                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
+                        >
+                          →
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
             </ScrollArea>
         </div>
 
