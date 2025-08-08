@@ -147,8 +147,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       fetchConversations();
       
       toast({
-        title: "Sucesso!",
-        description: result.message || "Conversas foram salvas com sucesso.",
+        title: "Upload Concluído!",
+        description: `${result.processed || 0} conversas processadas com ${result.totalMessages || 0} mensagens salvas.`,
       });
     } catch (error) {
       if (error.name === 'AbortError') {
