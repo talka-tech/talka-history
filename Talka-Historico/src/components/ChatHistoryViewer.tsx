@@ -214,25 +214,47 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
           url: response.url
         });
         
-        if (response.status === 413) {
-          console.error('🚫 Payload too large (413):', {
-            fileSize: file.size,
-            contentLength: text.length,
-            sizeMB: (file.size / 1024 / 1024).toFixed(2)
-          });
-          throw new Error(`Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(2)}MB). O servidor não conseguiu processar. Tente dividir em arquivos menores ou reduzir o conteúdo.`);
-        }
+        let errorMessage = '';
+        let errorData: any = {};
         
-        let errorData;
         try {
           errorData = await response.json();
-          console.error('📄 Error response data:', errorData);
+          console.error('� Error response data:', errorData);
         } catch (parseError) {
           console.error('❌ Failed to parse error response:', parseError);
-          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+          const responseText = await response.text();
+          console.error('❌ Raw error response:', responseText.substring(0, 500));
         }
         
-        throw new Error(errorData.error || `Erro HTTP ${response.status}: ${response.statusText}`);
+        if (response.status === 413) {
+          errorMessage = `❌ ARQUIVO MUITO GRANDE (${(file.size / 1024 / 1024).toFixed(2)}MB)\n\n` +
+                        `O Vercel limita uploads em 3-4MB. Soluções:\n` +
+                        `• Divida o CSV em arquivos menores\n` +
+                        `• Remova colunas desnecessárias\n` +
+                        `• Use compressão antes do upload`;
+        } else if (response.status === 500) {
+          errorMessage = `❌ ERRO INTERNO DO SERVIDOR (500)\n\n` +
+                        `Detalhes: ${errorData.details || errorData.message || 'Erro desconhecido'}\n\n` +
+                        `Possíveis causas:\n` +
+                        `• Problema na configuração do Supabase\n` +
+                        `• Formato CSV incompatível\n` +
+                        `• Timeout no processamento\n\n` +
+                        `Erro técnico: ${errorData.supabaseError || errorData.error || 'N/A'}`;
+        } else if (response.status === 400) {
+          errorMessage = `❌ PROBLEMA NO ARQUIVO CSV\n\n` +
+                        `${errorData.error || 'Formato inválido'}\n\n` +
+                        `Verifique se:\n` +
+                        `• O arquivo tem as colunas corretas\n` +
+                        `• Não está corrompido\n` +
+                        `• Está em formato CSV válido`;
+        } else {
+          errorMessage = `❌ ERRO DESCONHECIDO (${response.status})\n\n` +
+                        `${errorData.error || errorData.message || response.statusText}\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Detalhes: ${JSON.stringify(errorData, null, 2)}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       console.log('✅ Response OK, parsing result...');
