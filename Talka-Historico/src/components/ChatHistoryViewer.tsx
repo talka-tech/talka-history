@@ -648,11 +648,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="text-xs bg-purple-700/40 text-purple-100 border-purple-600/40">
                             <Users className="w-3 h-3 mr-1" />
-                            {conversation.participants.length}
+                            {conversation.participants?.length || 0}
                             </Badge>
                             <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-200">
                             <MessageCircle className="w-3 h-3 mr-1" />
-                            {conversation.messageCount}
+                            {conversation.messageCount || 0}
                             </Badge>
                         </div>
                         </div>
@@ -679,7 +679,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div>
                     <h2 className="font-semibold text-white">{selectedConversation.title}</h2>
                     <p className="text-sm text-purple-200">
-                    {selectedConversation.participants.join(', ')} • {selectedConversation.messageCount} mensagens
+                    {selectedConversation.participants?.join(', ') || 'Sem participantes'} • {selectedConversation.messageCount || 0} mensagens
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -693,7 +693,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 {/* Messages */}
                 <ScrollArea className="flex-1 bg-purple-900/5">
                 <div className="p-6 space-y-4">
-                    {selectedConversation.messages.map((message) => (
+                    {(selectedConversation.messages || []).map((message) => (
                     <div key={message.id} className="animate-fade-in">
                         <div className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] ${message.fromMe ? 'order-2' : 'order-1'}`}>
