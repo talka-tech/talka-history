@@ -70,17 +70,19 @@ export default async function handler(req: any, res: any) {
     const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
     console.log('🏷️ Headers detectados:', headers);
 
-    // Mapeia índices das colunas importantes
+    // Mapeia índices das colunas importantes - CORRIGIDO para estrutura real do WhatsApp
     const columnMap = {
-      chat_id: headers.findIndex(h => h.includes('chat_id')),
-      mobile_number: headers.findIndex(h => h.includes('mobile_number') || h.includes('number')),
-      fromMe: headers.findIndex(h => h.includes('fromme')),
-      text: headers.findIndex(h => h.includes('text') || h.includes('message')),
-      timestamp: headers.findIndex(h => h.includes('created') || h.includes('timestamp') || h.includes('date')),
-      type: headers.findIndex(h => h.includes('type'))
+      message_id: 0,      // 590004
+      mobile_number: 1,   // +5513981925766
+      timestamp: 2,       // 2025-05-02 14:54:31
+      chat_id: 3,         // 3EB06C5B6994D89AB39602 (hash do chat)
+      fromMe: 4,          // 1 ou 0
+      type: 5,            // text
+      direction: 6,       // OUTGOING/INCOMING
+      text: 7             // MENSAGEM REAL ✅
     };
 
-    console.log('🗂️ Mapeamento de colunas:', columnMap);
+    console.log('🗂️ Mapeamento de colunas (WhatsApp):', columnMap);
 
     // Debug: Mostra primeira linha de dados para análise
     if (lines.length > 1) {
@@ -95,10 +97,10 @@ export default async function handler(req: any, res: any) {
       console.log('  - timestamp:', firstDataLine[columnMap.timestamp]);
     }
 
-    // Valida se colunas essenciais existem
-    if (columnMap.chat_id === -1 || columnMap.text === -1 || columnMap.type === -1) {
+    // Valida se colunas essenciais existem (agora baseado em índices fixos)
+    if (lines.length < 2) {
       return res.status(400).json({ 
-        error: 'Colunas obrigatórias ausentes: chat_id, text, type',
+        error: 'Arquivo CSV vazio ou sem dados',
         headers: headers
       });
     }
@@ -121,13 +123,16 @@ export default async function handler(req: any, res: any) {
           continue;
         }
 
-        // Extrai dados
+        // Extrai dados usando índices corretos
         const chat_id = values[columnMap.chat_id]?.trim()?.replace(/"/g, '') || 'unknown';
         const mobile_number = values[columnMap.mobile_number]?.trim()?.replace(/"/g, '') || '';
         const fromMe = values[columnMap.fromMe]?.trim()?.replace(/"/g, '') === '1';
-        const text = values[columnMap.text]?.trim()?.replace(/"/g, '') || '';
+        const rawText = values[columnMap.text]?.trim()?.replace(/"/g, '') || '';
         const timestamp = values[columnMap.timestamp]?.trim()?.replace(/"/g, '') || new Date().toISOString();
         const type = values[columnMap.type]?.trim()?.replace(/"/g, '')?.toLowerCase() || '';
+
+        // Corrige caracteres especiais do WhatsApp (ÃªÃ¡Ã£ → êáã)
+        const text = fixWhatsAppChars(rawText);
 
         // Só processa mensagens de texto válidas
         if (type === 'text' && text && text.length > 0) {
@@ -283,6 +288,33 @@ export default async function handler(req: any, res: any) {
       details: error.message
     });
   }
+}
+
+// Função auxiliar para corrigir caracteres especiais do WhatsApp
+function fixWhatsAppChars(text: string): string {
+  if (!text) return text;
+  
+  return text
+    .replace(/Ã¡/g, 'á')  // á
+    .replace(/Ã¢/g, 'â')  // â  
+    .replace(/Ã£/g, 'ã')  // ã
+    .replace(/Ã /g, 'à')  // à
+    .replace(/Ã©/g, 'é')  // é
+    .replace(/Ãª/g, 'ê')  // ê
+    .replace(/Ã­/g, 'í')  // í
+    .replace(/Ã³/g, 'ó')  // ó
+    .replace(/Ã´/g, 'ô')  // ô
+    .replace(/Ãµ/g, 'õ')  // õ
+    .replace(/Ãº/g, 'ú')  // ú
+    .replace(/Ã§/g, 'ç')  // ç
+    .replace(/Ã±/g, 'ñ')  // ñ
+    .replace(/Ã/g, 'Ã')   // Ã maiúsculo
+    .replace(/â€œ/g, '"') // aspas
+    .replace(/â€/g, '"')  // aspas
+    .replace(/â€™/g, "'") // aspas simples
+    .replace(/â€"/g, '-') // traço
+    .replace(/Â/g, '')    // remove Â desnecessário
+    .trim();
 }
 
 // Função auxiliar para parse de CSV

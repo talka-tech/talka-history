@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, Search, MessageCircle, Users, Calendar, FileText, LogOut } from 'lucide-react';
+import { Upload, Search, MessageCircle, Users, Calendar, FileText, LogOut, Settings, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 // Interfaces permanecem as mesmas
@@ -39,6 +39,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [isLoadingAfterUpload, setIsLoadingAfterUpload] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +71,53 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         });
     } finally {
         setIsFetching(false);
+        setIsLoadingAfterUpload(false); // Remove loading pós-upload
+    }
+  }, [currentUserId]);
+
+  // Função para limpar dados
+  const handleClearData = useCallback(async (type: 'conversations' | 'all') => {
+    const confirmMessage = type === 'all' 
+      ? 'Isso apagará TODAS as suas conversas e mensagens. Esta ação não pode ser desfeita!' 
+      : 'Isso apagará todas as suas conversas. Esta ação não pode ser desfeita!';
+    
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      setIsFetching(true);
+      
+      const response = await fetch(`/api/clear-data?type=${type}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': currentUserId.toString()
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao limpar dados');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "✅ Dados removidos!",
+        description: result.message,
+        variant: "default"
+      });
+
+      // Atualiza a lista
+      setConversations([]);
+      setSelectedConversation(null);
+      setShowSettings(false);
+
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível limpar os dados.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsFetching(false);
     }
   }, [currentUserId]);
 
@@ -404,6 +453,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       });
       
       // Atualiza a lista de conversas
+      setIsLoadingAfterUpload(true); // Ativa loading animado
       fetchConversations();
       
       toast({
@@ -559,14 +609,24 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             <p className="text-xs text-purple-200">Análise Inteligente de Conversas</p>
                         </div>
                     </div>
-                    <Button
-                        onClick={onLogout}
-                        variant="ghost"
-                        size="sm"
-                        className="text-purple-200 hover:bg-purple-700/30 hover:text-white border border-purple-600/30 hover:border-purple-500/50"
-                    >
-                        <LogOut className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            onClick={() => setShowSettings(!showSettings)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-200 hover:bg-purple-700/30 hover:text-white border border-purple-600/30 hover:border-purple-500/50"
+                        >
+                            <Settings className="w-4 h-4" />
+                        </Button>
+                        <Button
+                            onClick={onLogout}
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-200 hover:bg-purple-700/30 hover:text-white border border-purple-600/30 hover:border-purple-500/50"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </Button>
+                    </div>
                 </div>
                 
                 {/* Boas-vindas profissional */}
@@ -607,6 +667,33 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </Button>
             </div>
 
+            {/* Settings Panel */}
+            {showSettings && (
+              <div className="p-4 border-b border-purple-600/30 bg-purple-800/20">
+                <h3 className="text-white font-medium mb-3 text-sm">⚙️ Configurações</h3>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => handleClearData('conversations')}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-orange-300 border-orange-500/40 hover:bg-orange-500/20 hover:text-orange-200"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Limpar Conversas
+                  </Button>
+                  <Button
+                    onClick={() => handleClearData('all')}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-red-300 border-red-500/40 hover:bg-red-500/20 hover:text-red-200"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Apagar Tudo
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Search */}
             <div className="p-4 border-b border-purple-600/30">
                 <div className="relative">
@@ -623,8 +710,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             {/* Conversations List */}
             <ScrollArea className="flex-1">
                 <div className="p-2">
-                    {isFetching ? (
-                        <div className="text-center py-8 text-purple-300">Carregando conversas...</div>
+                    {isFetching || isLoadingAfterUpload ? (
+                        <div className="text-center py-8">
+                            <div className="flex flex-col items-center">
+                                <div className="w-8 h-8 border-4 border-purple-600/30 border-t-purple-400 rounded-full animate-spin mb-3"></div>
+                                <p className="text-purple-300 text-sm">
+                                    {isLoadingAfterUpload ? 'Atualizando conversas...' : 'Carregando conversas...'}
+                                </p>
+                            </div>
+                        </div>
                     ) : filteredConversations.map((conversation) => (
                     <Card
                         key={conversation.id}
