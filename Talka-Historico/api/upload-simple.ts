@@ -82,6 +82,19 @@ export default async function handler(req: any, res: any) {
 
     console.log('🗂️ Mapeamento de colunas:', columnMap);
 
+    // Debug: Mostra primeira linha de dados para análise
+    if (lines.length > 1) {
+      const firstDataLine = parseCSVLine(lines[1]);
+      console.log('🔍 Primeira linha de dados (exemplo):', firstDataLine);
+      console.log('🎯 Valores extraídos:');
+      console.log('  - chat_id:', firstDataLine[columnMap.chat_id]);
+      console.log('  - text:', firstDataLine[columnMap.text]);
+      console.log('  - type:', firstDataLine[columnMap.type]);
+      console.log('  - mobile_number:', firstDataLine[columnMap.mobile_number]);
+      console.log('  - fromMe:', firstDataLine[columnMap.fromMe]);
+      console.log('  - timestamp:', firstDataLine[columnMap.timestamp]);
+    }
+
     // Valida se colunas essenciais existem
     if (columnMap.chat_id === -1 || columnMap.text === -1 || columnMap.type === -1) {
       return res.status(400).json({ 
