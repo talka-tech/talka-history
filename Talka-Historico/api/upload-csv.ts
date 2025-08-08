@@ -6,7 +6,12 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export const config = {
   runtime: 'edge',
-  maxDuration: 60, // 60 segundos para arquivos grandes
+  maxDuration: 300, // 5 minutos para arquivos grandes
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb', // Aumenta o limite para 50MB
+    },
+  },
 };
 
 interface Message {
@@ -50,8 +55,28 @@ export default async function handler(request: Request) {
   }
 
   try {
-    // Ler o arquivo CSV diretamente do request body
-    const csvText = await request.text();
+    // Verificar o tamanho do conteúdo antes de processar
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 50 * 1024 * 1024) { // 50MB
+      return new Response(JSON.stringify({ error: 'File too large. Maximum size is 50MB.' }), {
+        status: 413, 
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`Starting CSV processing for user ${userId}, content length: ${contentLength}`);
+    
+    // Ler o arquivo CSV em chunks para melhor performance
+    let csvText = '';
+    try {
+      csvText = await request.text();
+    } catch (error) {
+      console.error('Error reading request body:', error);
+      return new Response(JSON.stringify({ error: 'Failed to read file content. File might be too large.' }), {
+        status: 413, 
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     
     if (!csvText || csvText.trim().length === 0) {
       return new Response(JSON.stringify({ error: 'Empty CSV file' }), {
@@ -62,6 +87,7 @@ export default async function handler(request: Request) {
 
     console.log(`Processing CSV with ${csvText.length} characters for user ${userId}`);
     
+    // Processar o CSV em batches menores para evitar timeout
     const conversations = parseCSVToConversations(csvText);
     
     if (conversations.length === 0) {
@@ -73,8 +99,8 @@ export default async function handler(request: Request) {
 
     console.log(`Found ${conversations.length} conversations to process`);
 
-    // Processar em lotes para evitar timeout com arquivos grandes
-    const batchSize = 5; // Processar 5 conversas por vez
+    // Processar em lotes menores para evitar timeout com arquivos grandes
+    const batchSize = 3; // Reduzir para 3 conversas por vez
     let totalProcessed = 0;
 
     for (let i = 0; i < conversations.length; i += batchSize) {

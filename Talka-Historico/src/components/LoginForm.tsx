@@ -101,7 +101,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           <div className="text-center space-y-8 animate-fade-in">
             {/* Talka Logo */}
             <div className="flex items-center justify-center space-x-4 mb-8 animate-slide-up">
-              <div className="w-16 h-16 rounded-2xl bg-purple-700/30 backdrop-blur-sm flex items-center justify-center border border-purple-500/30 p-2 hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 rounded-2xl bg-white/90 backdrop-blur-sm flex items-center justify-center border border-purple-200/50 p-3 hover:scale-110 transition-transform duration-300 shadow-lg">
                 <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
               </div>
               <div className="text-left">
@@ -148,7 +148,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           {/* Header */}
           <div className="text-center space-y-2">
             <div className="lg:hidden flex items-center justify-center space-x-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center p-2">
+              <div className="w-12 h-12 rounded-xl bg-white/90 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-200/50">
                 <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
               </div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent">

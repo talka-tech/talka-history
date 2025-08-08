@@ -91,22 +91,52 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return;
     }
 
+    // Verificar o tamanho do arquivo (máximo 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Arquivo muito grande",
+        description: "O arquivo deve ter no máximo 50MB. Tente dividir em arquivos menores.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsUploading(true);
     
     try {
+      toast({
+        title: "Processando...",
+        description: "Lendo arquivo CSV, por favor aguarde...",
+      });
+
       const text = await file.text();
       
-      // Envia o CSV diretamente para a API (não processado)
+      toast({
+        title: "Enviando...",
+        description: "Enviando dados para o servidor, isso pode levar alguns minutos...",
+      });
+      
+      // Envia o CSV diretamente para a API com timeout maior
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutos
+      
       const response = await fetch('/api/upload-csv', {
         method: 'POST',
         headers: { 
           'Content-Type': 'text/plain',
           'x-user-id': currentUserId.toString()
         },
-        body: text
+        body: text,
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
+        if (response.status === 413) {
+          throw new Error('Arquivo muito grande. Tente dividir em arquivos menores (máximo 50MB).');
+        }
         const errorData = await response.json();
         throw new Error(errorData.error || 'Falha ao salvar o histórico.');
       }
@@ -121,11 +151,19 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         description: result.message || "Conversas foram salvas com sucesso.",
       });
     } catch (error) {
-      toast({
-        title: "Erro ao processar arquivo",
-        description: error.message,
-        variant: "destructive"
-      });
+      if (error.name === 'AbortError') {
+        toast({
+          title: "Timeout",
+          description: "O upload levou muito tempo. Tente com um arquivo menor.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Erro ao processar arquivo",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsUploading(false);
       // Limpa o input de arquivo para permitir o upload do mesmo arquivo novamente
@@ -248,7 +286,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             <div className="p-6 border-b border-purple-600/30">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center p-2">
+                        <div className="w-10 h-10 rounded-xl bg-white/90 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-200/50">
                             <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
                         </div>
                         <div>

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Shield, Activity, UserCheck, Clock, Edit, Key, BarChart3, User, RefreshCw, FileText } from 'lucide-react';
+import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Shield, Activity, UserCheck, Clock, Edit, Key, BarChart3, User, RefreshCw, FileText, UserX, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 // Interface expandida para incluir mais campos
@@ -231,6 +231,40 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
     }
   };
 
+  const handleToggleUserStatus = async (userId: number, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    
+    try {
+        const response = await fetch('/api/update-user-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              userId: userId,
+              status: newStatus 
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao alterar status do usuário.');
+        }
+
+        toast({
+            title: "Sucesso",
+            description: `Usuário ${newStatus === 'active' ? 'ativado' : 'desativado'} com sucesso!`,
+        });
+
+        fetchUsers(); // Atualiza a lista de usuários
+
+    } catch (error) {
+        toast({
+            title: "Erro",
+            description: error.message,
+            variant: "destructive"
+        });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -260,7 +294,9 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
         <div className="flex justify-between items-center mb-8 p-6 rounded-2xl bg-gradient-to-r from-purple-800/80 via-purple-700/80 to-purple-800/80 text-white shadow-lg shadow-purple-900/50 backdrop-blur-sm border border-purple-600/30">
           <div>
             <h1 className="text-4xl font-bold flex items-center gap-3">
-              <img src="/img/logo.png" alt="Talka Logo" className="w-10 h-10 object-contain" />
+              <div className="w-10 h-10 rounded-xl bg-white/90 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-200/50">
+                <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
+              </div>
               Talka Admin
             </h1>
             <p className="text-purple-100 mt-2">Gestão completa de usuários da plataforma Talka</p>
@@ -472,6 +508,23 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
+                              
+                              {/* Botão para ativar/desativar usuário */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleUserStatus(user.id, user.status)}
+                                className={`${
+                                  user.status === 'active' 
+                                    ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50' 
+                                    : 'text-green-600 hover:text-green-700 hover:bg-green-50'
+                                }`}
+                                disabled={user.username === 'admin'}
+                                title={user.status === 'active' ? 'Desativar usuário' : 'Ativar usuário'}
+                              >
+                                {user.status === 'active' ? <UserX className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                              </Button>
+                              
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
