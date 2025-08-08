@@ -91,12 +91,12 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return;
     }
 
-    // Verificar o tamanho do arquivo (máximo 10MB para ser mais conservador)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    // Verificar o tamanho do arquivo (máximo 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (file.size > maxSize) {
       toast({
         title: "Arquivo muito grande",
-        description: "O arquivo deve ter no máximo 10MB. Tente dividir em arquivos menores.",
+        description: "O arquivo deve ter no máximo 50MB. Tente dividir em arquivos menores.",
         variant: "destructive"
       });
       return;
@@ -135,7 +135,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
       if (!response.ok) {
         if (response.status === 413) {
-          throw new Error('Arquivo muito grande. Tente dividir em arquivos menores (máximo 10MB).');
+          throw new Error('Arquivo muito grande. Tente dividir em arquivos menores (máximo 50MB).');
         }
         const errorData = await response.json();
         throw new Error(errorData.error || 'Falha ao salvar o histórico.');

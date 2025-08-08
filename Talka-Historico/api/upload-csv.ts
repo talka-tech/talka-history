@@ -7,6 +7,12 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Configuração sem Edge Runtime para suportar arquivos maiores
 export const config = {
   maxDuration: 300, // 5 minutos
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb', // Aumentar limite para 50MB
+    },
+    responseLimit: false,
+  },
 };
 
 interface Message {
@@ -78,7 +84,7 @@ export default async function handler(request: Request) {
 
     console.log(`Processing CSV with ${csvText.length} characters for user ${userId}`);
     
-    // Processar o CSV em batches menores para evitar timeout
+    // Para arquivos grandes, processar de forma mais otimizada
     const conversations = parseCSVToConversations(csvText);
     
     if (conversations.length === 0) {
@@ -90,81 +96,87 @@ export default async function handler(request: Request) {
 
     console.log(`Found ${conversations.length} conversations to process`);
 
-    // Processar em lotes menores para evitar timeout com arquivos grandes
-    const batchSize = 3; // Reduzir para 3 conversas por vez
+    // Para CSVs grandes, processar uma conversa por vez com feedback
     let totalProcessed = 0;
+    let totalMessages = 0;
 
-    for (let i = 0; i < conversations.length; i += batchSize) {
-      const batch = conversations.slice(i, i + batchSize);
-      
-      for (const convo of batch) {
-        try {
-          // Inserir/atualizar conversa
-          const { error: convoError } = await supabase
-            .from('conversations')
-            .upsert({
-              id: convo.id,
-              title: convo.title,
-              participants: convo.participants,
-              message_count: convo.messageCount,
-              last_message: convo.lastMessage,
-              last_timestamp: convo.lastTimestamp,
-              owner_user_id: parseInt(userId)
-            }, {
-              onConflict: 'id'
-            });
+    for (const convo of conversations) {
+      try {
+        console.log(`Processing conversation: ${convo.title} with ${convo.messages.length} messages`);
+        
+        // Inserir/atualizar conversa
+        const { error: convoError } = await supabase
+          .from('conversations')
+          .upsert({
+            id: convo.id,
+            title: convo.title,
+            participants: convo.participants,
+            message_count: convo.messageCount,
+            last_message: convo.lastMessage,
+            last_timestamp: convo.lastTimestamp,
+            owner_user_id: parseInt(userId)
+          }, {
+            onConflict: 'id'
+          });
 
-          if (convoError) {
-            console.error('Error inserting conversation:', convoError);
-            continue;
-          }
-
-          // Deletar mensagens existentes da conversa
-          const { error: deleteError } = await supabase
-            .from('messages')
-            .delete()
-            .eq('conversation_id', convo.id);
-
-          if (deleteError) {
-            console.error('Error deleting old messages:', deleteError);
-          }
-
-          // Inserir mensagens em lotes
-          const messageBatchSize = 100; // 100 mensagens por vez
-          for (let j = 0; j < convo.messages.length; j += messageBatchSize) {
-            const messageBatch = convo.messages.slice(j, j + messageBatchSize);
-            
-            const messagesToInsert = messageBatch.map(msg => ({
-              conversation_id: convo.id,
-              timestamp: msg.timestamp,
-              sender: msg.sender,
-              content: msg.content,
-              from_me: msg.fromMe
-            }));
-
-            const { error: msgError } = await supabase
-              .from('messages')
-              .insert(messagesToInsert);
-
-            if (msgError) {
-              console.error('Error inserting messages batch:', msgError);
-            }
-          }
-
-          totalProcessed++;
-          console.log(`Processed conversation ${totalProcessed}/${conversations.length}: ${convo.title}`);
-          
-        } catch (convError) {
-          console.error(`Error processing conversation ${convo.id}:`, convError);
+        if (convoError) {
+          console.error('Error inserting conversation:', convoError);
           continue;
         }
+
+        // Deletar mensagens existentes da conversa
+        const { error: deleteError } = await supabase
+          .from('messages')
+          .delete()
+          .eq('conversation_id', convo.id);
+
+        if (deleteError) {
+          console.error('Error deleting old messages:', deleteError);
+        }
+
+        // Inserir mensagens em batches muito pequenos para evitar timeout
+        const messageBatchSize = 20; // Apenas 20 mensagens por vez
+        for (let j = 0; j < convo.messages.length; j += messageBatchSize) {
+          const messageBatch = convo.messages.slice(j, j + messageBatchSize);
+          
+          const messagesToInsert = messageBatch.map(msg => ({
+            conversation_id: convo.id,
+            timestamp: msg.timestamp,
+            sender: msg.sender,
+            content: msg.content,
+            from_me: msg.fromMe
+          }));
+
+          const { error: msgError } = await supabase
+            .from('messages')
+            .insert(messagesToInsert);
+
+          if (msgError) {
+            console.error('Error inserting messages batch:', msgError);
+          } else {
+            totalMessages += messageBatch.length;
+          }
+
+          // Pequena pausa para não sobrecarregar
+          if (j > 0 && j % 100 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
+
+        totalProcessed++;
+        console.log(`✓ Processed conversation ${totalProcessed}/${conversations.length}: ${convo.title} (${convo.messages.length} messages)`);
+        
+      } catch (convError) {
+        console.error(`Error processing conversation ${convo.id}:`, convError);
+        continue;
       }
     }
     
     return new Response(JSON.stringify({ 
-      message: `${totalProcessed} conversas processadas com sucesso.`,
+      message: `Upload concluído com sucesso!`,
       total: conversations.length,
-      processed: totalProcessed
+      processed: totalProcessed,
+      totalMessages: totalMessages
     }), {
       status: 200, 
       headers: { 'Content-Type': 'application/json' },
@@ -182,53 +194,88 @@ export default async function handler(request: Request) {
   }
 }
 
-// --- Funções de Parsing ---
+// --- Funções de Parsing Otimizadas ---
 function parseCSVToConversations(csvText: string): Conversation[] {
-  const lines = csvText.split('\n').filter(line => line.trim());
+  console.log('Starting CSV parsing...');
+  
+  const lines = csvText.split('\n');
   if (lines.length === 0) return [];
   
+  // Processar header
   const headers = lines[0].split(',').map(h => h.trim());
-  const messages: any[] = [];
+  console.log('CSV Headers:', headers);
+  
+  // Índices das colunas importantes
+  const chatIdIndex = headers.indexOf('chat_id');
+  const mobileNumberIndex = headers.indexOf('mobile_number');
+  const fromMeIndex = headers.indexOf('fromMe');
+  const textIndex = headers.indexOf('text');
+  const messageCreatedIndex = headers.indexOf('message_created');
+  const typeIndex = headers.indexOf('type');
+  
+  if (chatIdIndex === -1 || textIndex === -1) {
+    throw new Error('CSV format invalid. Required columns: chat_id, text');
+  }
+
+  // Processar mensagens linha por linha para evitar sobrecarga de memória
+  const conversationMap = new Map<string, any[]>();
+  let processedLines = 0;
+  let validMessages = 0;
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (!line.trim()) continue;
     
-    const values = parseCSVLine(line);
+    processedLines++;
+    if (processedLines % 1000 === 0) {
+      console.log(`Processed ${processedLines} lines, found ${validMessages} valid messages`);
+    }
     
-    if (values.length >= headers.length) {
-      const chat_id = values[headers.indexOf('chat_id')]?.trim();
-      const mobile_number = values[headers.indexOf('mobile_number')]?.trim();
-      const fromMe = values[headers.indexOf('fromMe')]?.trim();
-      const text = values[headers.indexOf('text')]?.trim();
-      const message_created = values[headers.indexOf('message_created')]?.trim();
-      const type = values[headers.indexOf('type')]?.trim();
+    try {
+      const values = parseCSVLine(line);
+      
+      if (values.length < headers.length) continue;
+      
+      const chat_id = values[chatIdIndex]?.trim();
+      const mobile_number = values[mobileNumberIndex]?.trim();
+      const fromMe = values[fromMeIndex]?.trim();
+      const text = values[textIndex]?.trim();
+      const message_created = values[messageCreatedIndex]?.trim();
+      const type = values[typeIndex]?.trim();
 
-      if (type !== 'text' || !text) continue;
+      // Filtrar apenas mensagens de texto válidas
+      if (type !== 'text' || !text || !chat_id) continue;
 
       const sender = fromMe === '1' ? 'Você' : (mobile_number || 'Desconhecido');
 
-      messages.push({
+      const message = {
         timestamp: message_created || new Date().toISOString(),
         sender: sender,
-        content: text,
-        conversationId: chat_id || 'default',
+        content: text.substring(0, 1000), // Limitar tamanho da mensagem
+        conversationId: chat_id,
         fromMe: fromMe === '1'
-      });
+      };
+
+      // Adicionar à conversa correspondente
+      if (!conversationMap.has(chat_id)) {
+        conversationMap.set(chat_id, []);
+      }
+      conversationMap.get(chat_id)!.push(message);
+      validMessages++;
+      
+    } catch (lineError) {
+      console.warn(`Error parsing line ${i}:`, lineError);
+      continue;
     }
   }
 
-  const conversationMap = new Map<string, any[]>();
-  messages.forEach(msg => {
-    const convId = msg.conversationId;
-    if (!conversationMap.has(convId)) {
-      conversationMap.set(convId, []);
-    }
-    conversationMap.get(convId)!.push(msg);
-  });
+  console.log(`Parsing completed: ${validMessages} valid messages in ${conversationMap.size} conversations`);
 
+  // Converter Map para array de conversas
   const conversations: Conversation[] = [];
   conversationMap.forEach((msgs, convId) => {
+    if (msgs.length === 0) return;
+    
     const participants = [...new Set(msgs.map(m => m.sender))];
     const sortedMsgs = msgs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     const lastMsg = sortedMsgs[sortedMsgs.length - 1];
@@ -240,7 +287,7 @@ function parseCSVToConversations(csvText: string): Conversation[] {
     
     conversations.push({
       id: convId,
-      title: title,
+      title: title.substring(0, 100), // Limitar tamanho do título
       participants,
       messageCount: msgs.length,
       lastMessage: lastMsg.content.substring(0, 50) + (lastMsg.content.length > 50 ? '...' : ''),
@@ -249,7 +296,13 @@ function parseCSVToConversations(csvText: string): Conversation[] {
     });
   });
 
-  return conversations.sort((a, b) => new Date(b.lastTimestamp).getTime() - new Date(a.lastTimestamp).getTime());
+  // Limitar número de conversas e ordenar por data
+  const sortedConversations = conversations
+    .sort((a, b) => new Date(b.lastTimestamp).getTime() - new Date(a.lastTimestamp).getTime())
+    .slice(0, 50); // Limitar a 50 conversas mais recentes para evitar sobrecarga
+
+  console.log(`Returning ${sortedConversations.length} conversations`);
+  return sortedConversations;
 }
 
 function parseCSVLine(line: string): string[] {
