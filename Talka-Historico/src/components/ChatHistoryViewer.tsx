@@ -46,6 +46,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [conversationsPerPage] = useState(10);
+  const [visibleConversations, setVisibleConversations] = useState(10); // Para carregamento lazy
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Função para extrair nome da empresa do username
@@ -613,7 +614,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return titleMatch || participantsMatch || messagesMatch;
     }), [conversations, searchTerm]);
 
-  // Paginação
+  // Paginação com carregamento lazy
   const totalPages = Math.ceil(filteredConversations.length / conversationsPerPage);
   const startIndex = (currentPage - 1) * conversationsPerPage;
   const endIndex = startIndex + conversationsPerPage;
@@ -622,10 +623,66 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   // Reset página quando filtro muda
   useEffect(() => {
     setCurrentPage(1);
+    setVisibleConversations(10); // Reset carregamento lazy também
   }, [searchTerm]);
 
   const formatTimestamp = useCallback((timestamp: string) => {
-    return new Date(timestamp).toLocaleString('pt-BR');
+    if (!timestamp || timestamp === 'Invalid Date') return '';
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleString('pt-BR');
+    } catch {
+      return '';
+    }
+  }, []);
+
+  // Função para detectar e renderizar imagens
+  const renderMessageContent = useCallback((content: string) => {
+    // Regex para detectar URLs de imagem da Amazon S3
+    const imageUrlRegex = /https:\/\/sfmediastrg\.s3\.amazonaws\.com\/[^\s]+\.(jpg|jpeg|png|gif|webp)/gi;
+    const imageUrls = content.match(imageUrlRegex);
+    
+    if (imageUrls && imageUrls.length > 0) {
+      const textWithoutImages = content.replace(imageUrlRegex, '').trim();
+      return (
+        <div className="space-y-2">
+          {textWithoutImages && (
+            <p className="text-sm leading-relaxed">
+              {textWithoutImages}
+            </p>
+          )}
+          <div className="grid gap-2">
+            {imageUrls.map((url, index) => (
+              <div key={index} className="relative group">
+                <img 
+                  src={url}
+                  alt="Imagem compartilhada"
+                  className="max-w-full h-auto rounded-lg border border-purple-500/30 cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ maxHeight: '300px', objectFit: 'contain' }}
+                  onClick={() => window.open(url, '_blank')}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-black/50 rounded px-2 py-1 text-xs text-white">
+                    Clique para ampliar
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <p className="text-sm leading-relaxed">
+        {content}
+      </p>
+    );
   }, []);
 
   // O restante do componente (o return com o JSX) continua exatamente o mesmo
@@ -678,8 +735,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 Bem-vindo(a), {getCompanyDisplayName(currentUser)}!
                             </h2>
                             <p className="text-purple-200 text-sm">
-                                {conversations.length} conversa{conversations.length !== 1 ? 's' : ''} disponível{conversations.length !== 1 ? 'eis' : ''}
-                                {searchTerm && ` • ${filteredConversations.length} filtrada${filteredConversations.length !== 1 ? 's' : ''}`}
+                                {conversations.length} conversas disponíveis
+                                {searchTerm && ` • ${filteredConversations.length} filtradas`}
                             </p>
                         </div>
                     </div>
@@ -764,7 +821,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             {conversation.title || 'Conversa sem título'}
                         </h3>
                         <span className="text-xs text-purple-300 ml-2">
-                            {conversation.lastTimestamp ? formatTimestamp(conversation.lastTimestamp).split(' ')[0] : 'Data inválida'}
+                            {conversation.lastTimestamp && conversation.lastTimestamp !== 'Invalid Date' 
+                              ? formatTimestamp(conversation.lastTimestamp).split(' ')[0] 
+                              : ''}
                         </span>
                         </div>
                         <p className="text-xs text-purple-200 mb-2 truncate">
@@ -800,38 +859,29 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         <p className="text-sm text-purple-300">Tente pesquisar com outros termos</p>
                     </div>
                     )}
+                    
+                    {/* Botão carregar mais (carregamento lazy) */}
+                    {!isFetching && currentConversations.length > 0 && currentPage < totalPages && (
+                      <div className="p-4 text-center">
+                        <Button
+                          onClick={() => setCurrentPage(prev => prev + 1)}
+                          variant="outline"
+                          size="sm"
+                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20"
+                        >
+                          Carregar próxima página ({currentPage + 1} de {totalPages})
+                        </Button>
+                      </div>
+                    )}
                 </div>
                 
-                {/* Paginação */}
+                {/* Info de paginação simplificada */}
                 {totalPages > 1 && (
                   <div className="p-4 border-t border-purple-600/30">
-                    <div className="flex items-center justify-between">
+                    <div className="text-center">
                       <p className="text-xs text-purple-300">
                         Página {currentPage} de {totalPages} • {filteredConversations.length} conversas
                       </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                          variant="outline"
-                          size="sm"
-                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
-                        >
-                          ←
-                        </Button>
-                        <span className="text-xs text-purple-200 px-2">
-                          {currentPage}
-                        </span>
-                        <Button
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                          variant="outline"
-                          size="sm"
-                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
-                        >
-                          →
-                        </Button>
-                      </div>
                     </div>
                   </div>
                 )}
@@ -847,13 +897,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div>
                     <h2 className="font-semibold text-white">{selectedConversation.title}</h2>
                     <p className="text-sm text-purple-200">
-                    {selectedConversation.participants?.join(', ') || 'Sem participantes'} • {selectedConversation.messageCount || 0} mensagens
+                    {selectedConversation.participants?.length > 0 ? selectedConversation.participants.join(', ') : 'Sem participantes'} • {selectedConversation.messageCount || selectedConversation.messages?.length || 0} mensagens
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Badge variant="outline" className="border-purple-500/40 text-purple-200">
                     <Calendar className="w-3 h-3 mr-1" />
-                    {formatTimestamp(selectedConversation.lastTimestamp)}
+                    {selectedConversation.lastTimestamp && selectedConversation.lastTimestamp !== 'Invalid Date' 
+                      ? formatTimestamp(selectedConversation.lastTimestamp) 
+                      : 'Data não disponível'}
                     </Badge>
                 </div>
                 </div>
@@ -878,11 +930,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white ml-4 border border-purple-500/30' 
                                 : 'bg-purple-800/30 border border-purple-600/40 mr-4 text-purple-100 backdrop-blur-sm'
                             }`}>
-                            <p className={`text-sm leading-relaxed ${
-                                message.fromMe ? 'text-white' : 'text-purple-100'
-                            }`}>
-                                {message.content}
-                            </p>
+                            <div className={message.fromMe ? 'text-white' : 'text-purple-100'}>
+                                {renderMessageContent(message.content)}
+                            </div>
                             </div>
                         </div>
                         </div>
@@ -928,7 +978,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     <span className="text-sm font-medium">Atenção:</span>
                   </div>
                   <p className="text-xs text-red-200 mt-1">
-                    Você tem {conversations.length} conversa{conversations.length !== 1 ? 's' : ''} que ser{conversations.length !== 1 ? 'ão' : 'á'} removida{conversations.length !== 1 ? 's' : ''} do banco de dados.
+                    Você tem {conversations.length} conversas que serão removidas do banco de dados.
                   </p>
                 </div>
                 
