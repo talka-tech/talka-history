@@ -91,12 +91,12 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return;
     }
 
-    // Verificar o tamanho do arquivo (máximo 50MB)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    // Verificar o tamanho do arquivo (máximo 10MB para ser mais conservador)
+    const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       toast({
         title: "Arquivo muito grande",
-        description: "O arquivo deve ter no máximo 50MB. Tente dividir em arquivos menores.",
+        description: "O arquivo deve ter no máximo 10MB. Tente dividir em arquivos menores.",
         variant: "destructive"
       });
       return;
@@ -135,7 +135,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
       if (!response.ok) {
         if (response.status === 413) {
-          throw new Error('Arquivo muito grande. Tente dividir em arquivos menores (máximo 50MB).');
+          throw new Error('Arquivo muito grande. Tente dividir em arquivos menores (máximo 10MB).');
         }
         const errorData = await response.json();
         throw new Error(errorData.error || 'Falha ao salvar o histórico.');
@@ -286,7 +286,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             <div className="p-6 border-b border-purple-600/30">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-white/90 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-200/50">
+                        <div className="w-10 h-10 rounded-xl bg-purple-200/40 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-300/50">
                             <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
                         </div>
                         <div>

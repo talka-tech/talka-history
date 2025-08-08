@@ -4,14 +4,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Configuração sem Edge Runtime para suportar arquivos maiores
 export const config = {
-  runtime: 'edge',
-  maxDuration: 300, // 5 minutos para arquivos grandes
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb', // Aumenta o limite para 50MB
-    },
-  },
+  maxDuration: 300, // 5 minutos
 };
 
 interface Message {
@@ -32,17 +27,22 @@ interface Conversation {
 }
 
 export default async function handler(request: Request) {
+  // Headers CORS para permitir requisições
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-user-id',
+  };
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers });
+  }
+
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405, 
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  if (!request.body) {
-    return new Response(JSON.stringify({ error: 'No file body found in the request' }), {
-      status: 400, 
-      headers: { 'Content-Type': 'application/json' },
+      headers,
     });
   }
 
@@ -50,38 +50,29 @@ export default async function handler(request: Request) {
   if (!userId) {
     return new Response(JSON.stringify({ error: 'User ID is required' }), {
       status: 401, 
-      headers: { 'Content-Type': 'application/json' },
+      headers,
     });
   }
 
   try {
-    // Verificar o tamanho do conteúdo antes de processar
-    const contentLength = request.headers.get('content-length');
-    if (contentLength && parseInt(contentLength) > 50 * 1024 * 1024) { // 50MB
-      return new Response(JSON.stringify({ error: 'File too large. Maximum size is 50MB.' }), {
-        status: 413, 
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log(`Starting CSV processing for user ${userId}, content length: ${contentLength}`);
+    console.log(`Starting CSV processing for user ${userId}`);
     
-    // Ler o arquivo CSV em chunks para melhor performance
+    // Ler o conteúdo do arquivo com melhor tratamento de erro
     let csvText = '';
     try {
       csvText = await request.text();
     } catch (error) {
       console.error('Error reading request body:', error);
-      return new Response(JSON.stringify({ error: 'Failed to read file content. File might be too large.' }), {
-        status: 413, 
-        headers: { 'Content-Type': 'application/json' },
+      return new Response(JSON.stringify({ error: 'Failed to read file content. File might be too large or corrupted.' }), {
+        status: 400, 
+        headers,
       });
     }
     
     if (!csvText || csvText.trim().length === 0) {
       return new Response(JSON.stringify({ error: 'Empty CSV file' }), {
         status: 400, 
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
     }
 
@@ -93,7 +84,7 @@ export default async function handler(request: Request) {
     if (conversations.length === 0) {
       return new Response(JSON.stringify({ error: 'No valid conversations found in CSV' }), {
         status: 400, 
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
     }
 

@@ -294,7 +294,7 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
         <div className="flex justify-between items-center mb-8 p-6 rounded-2xl bg-gradient-to-r from-purple-800/80 via-purple-700/80 to-purple-800/80 text-white shadow-lg shadow-purple-900/50 backdrop-blur-sm border border-purple-600/30">
           <div>
             <h1 className="text-4xl font-bold flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/90 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-200/50">
+              <div className="w-10 h-10 rounded-xl bg-purple-200/40 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-300/50">
                 <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
               </div>
               Talka Admin
