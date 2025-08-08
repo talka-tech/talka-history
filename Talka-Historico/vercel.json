@@ -24,6 +24,10 @@
       "dest": "/api/test-chunk.ts"
     },
     {
+      "src": "/api/health",
+      "dest": "/api/health.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1.ts"
     }
