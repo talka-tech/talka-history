@@ -2,146 +2,84 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Talka Design System - Paleta de cores baseada na identidade visual da Talka
-Roxo/Violeta principal com gradientes azuis/ciano para comunicação moderna
+/* Talka Design System - Temática Roxo Escuro #12032d
+Design profissional com foco no roxo escuro como cor principal
 */
 
 @layer base {
   :root {
-    --background: 240 10% 98%;
-    --foreground: 230 15% 15%;
+    /* Base do tema roxo escuro como padrão */
+    --background: 272 86% 9%;
+    --foreground: 272 20% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 230 15% 15%;
+    --card: 272 86% 11%;
+    --card-foreground: 272 20% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 230 15% 15%;
+    --popover: 272 86% 11%;
+    --popover-foreground: 272 20% 95%;
 
-    /* Talka Primary - Roxo/Violeta principal da logo */
-    --primary: 270 85% 60%;
+    /* Talka Primary - Roxo escuro #12032d como base */
+    --primary: 272 86% 18%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 280 100% 70%;
+    --primary-glow: 272 100% 25%;
 
-    /* Talka cores específicas baseadas na identidade visual */
-    --talka-purple: 270 85% 60%;
-    --talka-blue: 220 85% 60%;
-    --talka-cyan: 190 85% 60%;
-    --talka-gradient-start: 270 85% 60%;
-    --talka-gradient-end: 190 85% 60%;
+    /* Talka cores específicas baseadas no roxo escuro */
+    --talka-dark-purple: 272 86% 9%;
+    --talka-purple: 272 86% 18%;
+    --talka-purple-light: 272 70% 35%;
+    --talka-purple-accent: 280 75% 45%;
+    --talka-blue: 250 85% 35%;
+    --talka-cyan: 190 75% 45%;
 
-    /* Chat-specific colors com paleta Talka */
-    --chat-primary: 270 85% 60%;
-    --chat-secondary: 220 85% 60%;
-    --chat-bubble-sent: 270 85% 60%;
-    --chat-bubble-received: 220 15% 95%;
-    --chat-sidebar: 240 20% 96%;
-    --chat-header: 270 85% 60%;
+    /* Chat-specific colors com paleta roxo escuro */
+    --chat-primary: 272 86% 18%;
+    --chat-secondary: 272 70% 25%;
+    --chat-bubble-sent: 272 86% 18%;
+    --chat-bubble-received: 272 50% 15%;
+    --chat-sidebar: 272 86% 11%;
+    --chat-header: 272 86% 18%;
 
-    /* Gradientes Talka - do roxo ao ciano */
-    --gradient-talka: linear-gradient(135deg, hsl(270 85% 60%), hsl(220 85% 60%), hsl(190 85% 60%));
-    --gradient-talka-subtle: linear-gradient(135deg, hsl(270 85% 60% / 0.1), hsl(190 85% 60% / 0.05));
-    --gradient-background: linear-gradient(135deg, hsl(240 10% 98%), hsl(270 10% 96%));
-    --gradient-header: linear-gradient(135deg, hsl(270 85% 60%), hsl(220 85% 60%));
+    /* Gradientes roxo escuro */
+    --gradient-talka: linear-gradient(135deg, hsl(272 86% 18%), hsl(280 75% 25%), hsl(250 85% 35%));
+    --gradient-talka-subtle: linear-gradient(135deg, hsl(272 86% 18% / 0.3), hsl(280 75% 25% / 0.1));
+    --gradient-background: linear-gradient(135deg, hsl(272 86% 9%), hsl(272 86% 7%));
+    --gradient-header: linear-gradient(135deg, hsl(272 86% 18%), hsl(280 75% 25%));
 
-    /* Shadows com cores Talka */
-    --shadow-talka: 0 10px 30px -10px hsl(270 85% 60% / 0.2);
-    --shadow-glow-talka: 0 0 30px hsl(270 85% 60% / 0.3);
+    /* Shadows com cores roxo escuro */
+    --shadow-talka: 0 10px 30px -10px hsl(272 86% 18% / 0.5);
+    --shadow-glow-talka: 0 0 30px hsl(272 86% 18% / 0.6);
 
     /* Animações */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 272 60% 15%;
+    --secondary-foreground: 272 20% 95%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 272 60% 15%;
+    --muted-foreground: 272 20% 65%;
 
-    --accent: 270 85% 95%;
-    --accent-foreground: 270 85% 20%;
+    --accent: 272 70% 20%;
+    --accent-foreground: 272 20% 95%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 272 20% 95%;
 
-    --border: 270 20% 90%;
-    --input: 270 20% 95%;
-    --ring: 270 85% 60%;
+    --border: 272 50% 20%;
+    --input: 272 50% 20%;
+    --ring: 272 86% 18%;
 
     --radius: 0.75rem;
 
-    /* Sidebar com tema Talka */
-    --sidebar-background: 270 10% 98%;
-    --sidebar-foreground: 270 15% 25%;
-    --sidebar-primary: 270 85% 60%;
+    /* Sidebar com tema roxo escuro */
+    --sidebar-background: 272 86% 9%;
+    --sidebar-foreground: 272 20% 95%;
+    --sidebar-primary: 272 86% 18%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 270 20% 95%;
-    --sidebar-accent-foreground: 270 85% 20%;
-    --sidebar-border: 270 20% 90%;
-    --sidebar-ring: 270 85% 60%;
-  }
-
-  .dark {
-    --background: 270 15% 8%;
-    --foreground: 270 5% 95%;
-
-    --card: 270 20% 10%;
-    --card-foreground: 270 5% 95%;
-
-    --popover: 270 20% 10%;
-    --popover-foreground: 270 5% 95%;
-
-    --primary: 270 85% 65%;
-    --primary-foreground: 270 15% 8%;
-
-    /* Talka cores escuras */
-    --talka-purple: 270 85% 65%;
-    --talka-blue: 220 85% 65%;
-    --talka-cyan: 190 85% 65%;
-    --talka-gradient-start: 270 85% 65%;
-    --talka-gradient-end: 190 85% 65%;
-
-    /* Chat-specific colors dark mode */
-    --chat-primary: 270 85% 65%;
-    --chat-secondary: 220 85% 65%;
-    --chat-bubble-sent: 270 85% 65%;
-    --chat-bubble-received: 270 15% 15%;
-    --chat-sidebar: 270 15% 10%;
-    --chat-header: 270 85% 65%;
-
-    /* Gradientes escuros */
-    --gradient-talka: linear-gradient(135deg, hsl(270 85% 65%), hsl(220 85% 65%), hsl(190 85% 65%));
-    --gradient-talka-subtle: linear-gradient(135deg, hsl(270 85% 65% / 0.1), hsl(190 85% 65% / 0.05));
-    --gradient-background: linear-gradient(135deg, hsl(270 15% 8%), hsl(270 15% 6%));
-    --gradient-header: linear-gradient(135deg, hsl(270 85% 65%), hsl(220 85% 65%));
-
-    /* Shadows escuras */
-    --shadow-talka: 0 10px 30px -10px hsl(270 85% 65% / 0.3);
-    --shadow-glow-talka: 0 0 30px hsl(270 85% 65% / 0.4);
-
-    --secondary: 270 15% 15%;
-    --secondary-foreground: 270 5% 95%;
-
-    --muted: 270 15% 15%;
-    --muted-foreground: 270 5% 65%;
-
-    --accent: 270 20% 15%;
-    --accent-foreground: 270 5% 95%;
-
-    --destructive: 0 62.8% 50.6%;
-    --destructive-foreground: 270 5% 95%;
-
-    --border: 270 20% 20%;
-    --input: 270 20% 20%;
-    --ring: 270 85% 65%;
-
-    --sidebar-background: 270 15% 8%;
-    --sidebar-foreground: 270 5% 95%;
-    --sidebar-primary: 270 85% 65%;
-    --sidebar-primary-foreground: 270 15% 8%;
-    --sidebar-accent: 270 20% 15%;
-    --sidebar-accent-foreground: 270 5% 95%;
-    --sidebar-border: 270 20% 20%;
-    --sidebar-ring: 270 85% 65%;
+    --sidebar-accent: 272 70% 20%;
+    --sidebar-accent-foreground: 272 20% 95%;
+    --sidebar-border: 272 50% 20%;
+    --sidebar-ring: 272 86% 18%;
   }
 }
 
@@ -232,34 +170,78 @@ Roxo/Violeta principal com gradientes azuis/ciano para comunicação moderna
     }
   }
 
-  /* Smooth scrollbar with Talka colors */
+  /* Smooth scrollbar com tema roxo escuro */
   ::-webkit-scrollbar {
     width: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    background: hsl(270 10% 95%);
+    background: hsl(272 60% 15%);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: hsl(270 85% 60%);
+    background: hsl(272 86% 18%);
     border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(270 85% 50%);
+    background: hsl(272 86% 25%);
   }
+}
 
-  /* Dark mode scrollbar */
-  .dark ::-webkit-scrollbar-track {
-    background: hsl(270 15% 15%);
+/* Custom animations for Login page */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-  .dark ::-webkit-scrollbar-thumb {
-    background: hsl(270 85% 65%);
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-  .dark ::-webkit-scrollbar-thumb:hover {
-    background: hsl(270 85% 75%);
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
   }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes rotate-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.6s ease-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-rotate-slow {
+  animation: rotate-slow 20s linear infinite;
 }

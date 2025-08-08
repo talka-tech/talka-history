@@ -41,6 +41,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [isFetching, setIsFetching] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Função para extrair nome da empresa do username
+  const getCompanyDisplayName = (username: string) => {
+    // Remove espaços extras e converte para título adequado
+    return username
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   // Função para buscar conversas salvas da API
   const fetchConversations = useCallback(async () => {
     setIsFetching(true);
@@ -232,35 +241,53 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
   // O restante do componente (o return com o JSX) continua exatamente o mesmo
   return (
-    <div className="h-screen bg-gradient-subtle flex">
+    <div className="h-screen flex bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" style={{backgroundColor: '#12032d'}}>
         {/* Sidebar */}
-        <div className="w-80 bg-chat-sidebar border-r border-border flex flex-col">
-            {/* Header */}
-            <div className="p-6 bg-gradient-primary text-primary-foreground">
-                <div className="flex justify-between items-center">
-                    <div>
-                    <h1 className="text-xl font-bold flex items-center gap-2">
-                        <MessageCircle className="w-6 h-6" />
-                        TalkaHistory
-                    </h1>
-                    <p className="text-sm opacity-90 mt-1">Análise de conversas</p>
-                    </div>
+        <div className="w-80 border-r border-purple-600/30 flex flex-col bg-gradient-to-b from-purple-900/40 to-purple-800/20 backdrop-blur-sm">
+            {/* Header com boas-vindas profissional */}
+            <div className="p-6 border-b border-purple-600/30">
+                <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                    <span className="text-sm opacity-90">Olá, {currentUser}</span>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center p-2">
+                            <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg font-bold text-white flex items-center gap-2">
+                                Talka Analytics
+                            </h1>
+                            <p className="text-xs text-purple-200">Análise Inteligente de Conversas</p>
+                        </div>
+                    </div>
                     <Button
                         onClick={onLogout}
                         variant="ghost"
                         size="sm"
-                        className="text-primary-foreground hover:bg-primary-foreground/20"
+                        className="text-purple-200 hover:bg-purple-700/30 hover:text-white border border-purple-600/30 hover:border-purple-500/50"
                     >
                         <LogOut className="w-4 h-4" />
                     </Button>
+                </div>
+                
+                {/* Boas-vindas profissional */}
+                <div className="bg-gradient-to-r from-purple-800/40 to-purple-700/30 rounded-xl p-4 border border-purple-600/20 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
+                            {getCompanyDisplayName(currentUser).charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                            <h2 className="text-white font-semibold">
+                                Bem-vindo(a), {getCompanyDisplayName(currentUser)}!
+                            </h2>
+                            <p className="text-purple-200 text-sm">
+                                {conversations.length} conversa{conversations.length !== 1 ? 's' : ''} disponível{conversations.length !== 1 ? 'eis' : ''}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Upload Section */}
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-purple-600/30">
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -271,23 +298,23 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <Button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="w-full"
+                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white border border-purple-500/30"
                     variant="outline"
                 >
                     <Upload className="w-4 h-4 mr-2" />
-                    {isUploading ? 'Enviando...' : 'Importar CSV'}
+                    {isUploading ? 'Enviando...' : 'Importar Nova Conversa'}
                 </Button>
             </div>
 
             {/* Search */}
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-purple-600/30">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-300 w-4 h-4" />
                     <Input
-                    placeholder="Pesquisar conversas..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                        placeholder="Pesquisar conversas..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 bg-purple-900/30 border-purple-600/40 text-white placeholder:text-purple-300 focus:border-purple-400 backdrop-blur-sm"
                     />
                 </div>
             </div>
@@ -296,33 +323,33 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             <ScrollArea className="flex-1">
                 <div className="p-2">
                     {isFetching ? (
-                        <div className="text-center py-8 text-muted-foreground">Carregando conversas...</div>
+                        <div className="text-center py-8 text-purple-300">Carregando conversas...</div>
                     ) : filteredConversations.map((conversation) => (
                     <Card
                         key={conversation.id}
-                        className={`p-4 mb-2 cursor-pointer transition-all hover:shadow-md ${
+                        className={`p-4 mb-2 cursor-pointer transition-all hover:shadow-md border-purple-600/30 bg-purple-800/20 hover:bg-purple-700/30 ${
                         selectedConversation?.id === conversation.id 
-                            ? 'ring-2 ring-primary bg-primary/5' 
+                            ? 'ring-2 ring-purple-400 bg-purple-700/40 border-purple-400/50' 
                             : ''
                         }`}
                         onClick={() => setSelectedConversation(conversation)}
                     >
                         <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-sm truncate flex-1">{conversation.title}</h3>
-                        <span className="text-xs text-muted-foreground ml-2">
+                        <h3 className="font-medium text-sm truncate flex-1 text-white">{conversation.title}</h3>
+                        <span className="text-xs text-purple-300 ml-2">
                             {formatTimestamp(conversation.lastTimestamp).split(' ')[0]}
                         </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-2 truncate">
+                        <p className="text-xs text-purple-200 mb-2 truncate">
                         {conversation.lastMessage}
                         </p>
                         <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="text-xs bg-purple-700/40 text-purple-100 border-purple-600/40">
                             <Users className="w-3 h-3 mr-1" />
                             {conversation.participants.length}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-200">
                             <MessageCircle className="w-3 h-3 mr-1" />
                             {conversation.messageCount}
                             </Badge>
@@ -332,10 +359,10 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     ))}
                     
                     {!isFetching && conversations.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>Nenhuma conversa encontrada</p>
-                        <p className="text-sm">Importe um arquivo CSV para começar</p>
+                    <div className="text-center py-8 text-purple-300">
+                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50 text-purple-400" />
+                        <p className="text-white">Nenhuma conversa encontrada</p>
+                        <p className="text-sm text-purple-300">Importe um arquivo CSV para começar</p>
                     </div>
                     )}
                 </div>
@@ -343,19 +370,19 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col bg-purple-900/10 backdrop-blur-sm">
             {selectedConversation ? (
             <>
                 {/* Chat Header */}
-                <div className="p-4 border-b border-border bg-card flex items-center justify-between">
+                <div className="p-4 border-b border-purple-600/30 bg-purple-800/20 backdrop-blur-sm flex items-center justify-between">
                 <div>
-                    <h2 className="font-semibold">{selectedConversation.title}</h2>
-                    <p className="text-sm text-muted-foreground">
+                    <h2 className="font-semibold text-white">{selectedConversation.title}</h2>
+                    <p className="text-sm text-purple-200">
                     {selectedConversation.participants.join(', ')} • {selectedConversation.messageCount} mensagens
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="border-purple-500/40 text-purple-200">
                     <Calendar className="w-3 h-3 mr-1" />
                     {formatTimestamp(selectedConversation.lastTimestamp)}
                     </Badge>
@@ -363,27 +390,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </div>
 
                 {/* Messages */}
-                <ScrollArea className="flex-1 bg-background">
+                <ScrollArea className="flex-1 bg-purple-900/5">
                 <div className="p-6 space-y-4">
                     {selectedConversation.messages.map((message) => (
                     <div key={message.id} className="animate-fade-in">
                         <div className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] ${message.fromMe ? 'order-2' : 'order-1'}`}>
                             <div className={`flex items-center gap-2 mb-1 ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-purple-300">
                                 {formatTimestamp(message.timestamp)}
                             </span>
-                            <span className="text-sm font-medium text-foreground">
+                            <span className="text-sm font-medium text-purple-100">
                                 {message.sender}
                             </span>
                             </div>
                             <div className={`p-3 rounded-lg shadow-sm ${
                             message.fromMe 
-                                ? 'bg-blue-500 text-white ml-4' 
-                                : 'bg-card border mr-4'
+                                ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white ml-4 border border-purple-500/30' 
+                                : 'bg-purple-800/30 border border-purple-600/40 mr-4 text-purple-100 backdrop-blur-sm'
                             }`}>
                             <p className={`text-sm leading-relaxed ${
-                                message.fromMe ? 'text-white' : 'text-foreground'
+                                message.fromMe ? 'text-white' : 'text-purple-100'
                             }`}>
                                 {message.content}
                             </p>
@@ -396,11 +423,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </ScrollArea>
             </>
             ) : (
-            <div className="flex-1 flex items-center justify-center bg-gradient-chat">
+            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-purple-900/20 to-purple-800/10">
                 <div className="text-center">
-                <MessageCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-medium mb-2">Selecione uma conversa</h3>
-                <p className="text-muted-foreground">
+                <MessageCircle className="w-16 h-16 mx-auto mb-4 text-purple-400 opacity-50" />
+                <h3 className="text-lg font-medium mb-2 text-white">Selecione uma conversa</h3>
+                <p className="text-purple-200">
                     Escolha uma conversa da lista para visualizar as mensagens
                 </p>
                 </div>
