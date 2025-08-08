@@ -39,6 +39,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Função para extrair nome da empresa do username
@@ -86,6 +87,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       
       console.log(`[CHUNK UPLOAD] Iniciando upload de ${totalChunks} chunks de 1MB`);
       
+      // Inicializa progresso
+      setUploadProgress({ current: 0, total: totalChunks, message: 'Preparando upload...' });
+      
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, fileContent.length);
@@ -94,10 +98,18 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         
         console.log(`[CHUNK ${i + 1}/${totalChunks}] Tamanho: ${chunk.length} caracteres`);
         
+        // Atualiza progresso visual
+        const progressPercent = Math.round(((i + 1) / totalChunks) * 100);
+        setUploadProgress({ 
+          current: i + 1, 
+          total: totalChunks, 
+          message: `Enviando pedaço ${i + 1} de ${totalChunks} (${progressPercent}%)` 
+        });
+        
         toast({
-          title: `Enviando pedaço ${i + 1} de ${totalChunks}`,
-          description: `Progresso: ${Math.round(((i + 1) / totalChunks) * 100)}%`,
-          duration: 2000
+          title: `📤 Upload em andamento`,
+          description: `Pedaço ${i + 1}/${totalChunks} - ${progressPercent}% concluído`,
+          duration: 1500
         });
         
         const response = await fetch('/api/upload-csv-chunk', {
@@ -124,6 +136,12 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         console.log(`[CHUNK ${i + 1}] Sucesso:`, result);
         
         if (isLastChunk && result.totalProcessed) {
+          setUploadProgress({ 
+            current: totalChunks, 
+            total: totalChunks, 
+            message: `✅ Concluído! ${result.totalProcessed} mensagens processadas` 
+          });
+          
           toast({
             title: "🎉 Upload completo!",
             description: `${result.totalProcessed} mensagens processadas com sucesso`,
@@ -131,13 +149,20 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             duration: 10000
           });
         }
+        
+        // Pequena pausa entre chunks para não sobrecarregar
+        if (!isLastChunk) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
       
       return true;
     } catch (error) {
       console.error('[CHUNK UPLOAD ERROR]:', error);
+      setUploadProgress({ current: 0, total: 0, message: 'Erro no upload' });
+      
       toast({
-        title: "Erro no upload",
+        title: "❌ Erro no upload",
         description: error instanceof Error ? error.message : "Erro desconhecido durante upload em pedaços",
         variant: "destructive",
         duration: 10000
@@ -255,16 +280,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       console.log('🌐 Sending request to /api/upload-csv...');
       const requestStart = Date.now();
       
-      // **DECISÃO: Se arquivo > 3MB, usar chunks para evitar 413**
-      const isLargeFile = file.size > 3 * 1024 * 1024; // 3MB
+      // **DECISÃO: Se arquivo > 1MB, usar chunks para evitar 413 e 500**
+      const isLargeFile = file.size > 1 * 1024 * 1024; // 1MB - força chunks sempre
       
       if (isLargeFile) {
-        console.log('📦 Arquivo grande detectado, usando upload em chunks...');
+        console.log('📦 Arquivo detectado, usando upload em chunks para estabilidade...');
         
         toast({
-          title: "Arquivo grande detectado",
-          description: `Usando upload em pedaços para evitar erro 413...`,
-          duration: 3000
+          title: "🚀 Processando arquivo...",
+          description: `Usando upload otimizado em pedaços para garantir estabilidade...`,
+          duration: 5000
         });
         
         // Usar API de chunks
@@ -279,7 +304,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         }
       }
       
-      // Upload normal para arquivos pequenos
+      // Upload normal para arquivos pequenos (<1MB)
       const response = await fetch('/api/upload-csv', {
         method: 'POST',
         headers: { 
@@ -383,6 +408,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       }
     } finally {
       setIsUploading(false);
+      setUploadProgress({ current: 0, total: 0, message: '' }); // Limpa progresso
       // Limpa o input de arquivo para permitir o upload do mesmo arquivo novamente
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -689,6 +715,54 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             </div>
             )}
         </div>
+        
+        {/* Modal de Progresso do Upload */}
+        {isUploading && uploadProgress.total > 0 && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-gradient-to-br from-purple-900 to-purple-800 p-8 rounded-xl shadow-2xl border border-purple-600/50 max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <div className="absolute inset-0 border-4 border-purple-600/30 rounded-full"></div>
+                  <div 
+                    className="absolute inset-0 border-4 border-transparent border-t-purple-400 rounded-full animate-spin"
+                    style={{
+                      animationDuration: '1s'
+                    }}
+                  ></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-purple-300 font-bold text-sm">
+                      {Math.round((uploadProgress.current / uploadProgress.total) * 100)}%
+                    </span>
+                  </div>
+                </div>
+                
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  Processando arquivo...
+                </h3>
+                
+                <p className="text-purple-200 mb-4">
+                  {uploadProgress.message}
+                </p>
+                
+                <div className="w-full bg-purple-900/50 rounded-full h-3 mb-4">
+                  <div 
+                    className="bg-gradient-to-r from-purple-500 to-purple-400 h-3 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                  ></div>
+                </div>
+                
+                <div className="flex justify-between text-sm text-purple-300">
+                  <span>Pedaço {uploadProgress.current} de {uploadProgress.total}</span>
+                  <span>{Math.round((uploadProgress.current / uploadProgress.total) * 100)}%</span>
+                </div>
+                
+                <div className="mt-4 text-xs text-purple-400">
+                  ⚡ Upload otimizado em pedaços para máxima estabilidade
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };
