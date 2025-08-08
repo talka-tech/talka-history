@@ -20,8 +20,11 @@ export default async function handler(request: Request): Promise<Response> {
   console.log('🚀 Iniciando processamento de chunk CSV');
 
   try {
+    console.log('🔍 Step 1: Parsing JSON body...');
     // Ler dados do body JSON
     const body = await request.json();
+    console.log('✅ Step 1 OK: Body parsed');
+    
     const { chunk, chunkIndex, totalChunks, isLastChunk, userId } = body;
     const uploadId = `upload_${userId}_${Date.now()}`;
 
@@ -33,7 +36,9 @@ export default async function handler(request: Request): Promise<Response> {
       chunkSize: chunk?.length || 0
     });
 
+    console.log('🔍 Step 2: Validating parameters...');
     if (!userId) {
+      console.error('❌ User ID missing');
       return new Response(JSON.stringify({ error: 'User ID obrigatório' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -41,25 +46,53 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     if (!chunk || !chunk.trim()) {
+      console.error('❌ Chunk empty or invalid');
       return new Response(JSON.stringify({ error: 'Chunk vazio' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+    console.log('✅ Step 2 OK: Parameters valid');
 
     console.log('📄 Chunk recebido:', chunk.length, 'caracteres');
 
+    console.log('🔍 Step 3: Checking environment variables...');
     // Configurar Supabase
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_ANON_KEY;
     
     if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ Supabase environment variables missing:', { 
+        hasUrl: !!supabaseUrl, 
+        hasKey: !!supabaseKey 
+      });
       return new Response(JSON.stringify({ error: 'Banco não configurado' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+    console.log('✅ Step 3 OK: Environment variables present');
 
+    console.log('🔍 Step 3.5: Testing Supabase connection...');
+    try {
+      // Teste simples de conexão
+      const testResponse = await fetch(`${supabaseUrl}/rest/v1/`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        }
+      });
+      console.log('🔗 Supabase connection test:', testResponse.status);
+    } catch (connError) {
+      console.error('❌ Supabase connection failed:', connError.message);
+      return new Response(JSON.stringify({ error: 'Falha de conexão com banco' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    console.log('✅ Step 3.5 OK: Supabase connection working');
+
+    console.log('🔍 Step 4: Processing chunk lines...');
     // Processar linhas do chunk
     const lines = chunk.split('\n').filter(line => line.trim());
     console.log('📝 Linhas no chunk:', lines.length);
@@ -67,8 +100,10 @@ export default async function handler(request: Request): Promise<Response> {
     // Se é o primeiro chunk, pular header
     const dataLines = (chunkIndex === 0 && lines[0]?.includes('chat_id')) ? lines.slice(1) : lines;
     console.log('📊 Linhas de dados:', dataLines.length);
+    console.log('✅ Step 4 OK: Lines processed');
 
     if (dataLines.length === 0) {
+      console.log('⚠️ No data lines found, returning empty result');
       return new Response(JSON.stringify({
         success: true,
         message: 'Chunk processado (sem dados)',
@@ -233,11 +268,18 @@ export default async function handler(request: Request): Promise<Response> {
     });
 
   } catch (error) {
-    console.error('💥 Erro no chunk:', error);
+    console.error('💥 Erro crítico no chunk processing:', {
+      errorMessage: error.message,
+      errorStack: error.stack,
+      errorName: error.name,
+      timestamp: new Date().toISOString()
+    });
     
     return new Response(JSON.stringify({
       error: 'Erro no processamento do chunk',
-      details: error.message
+      details: error.message,
+      type: error.name,
+      stack: error.stack?.split('\n')[0] // Primeira linha do stack
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
