@@ -89,7 +89,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       lastModified: new Date(file.lastModified).toISOString()
     });
 
-    // Verificar se é um arquivo CSV (verificação dupla)
+    // Verificar se é um arquivo CSV
     const isCSV = file.name.toLowerCase().endsWith('.csv') || 
                   file.type === 'text/csv' || 
                   file.type === 'application/csv';
@@ -104,22 +104,20 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return;
     }
 
-    // Verificar o tamanho do arquivo (máximo 50MB)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    // Log do arquivo sem limite de tamanho
+    const sizeMB = (file.size / 1024 / 1024).toFixed(2);
     console.log('📊 File size check:', {
       fileSize: file.size,
-      maxSize: maxSize,
-      sizeMB: (file.size / 1024 / 1024).toFixed(2)
+      sizeMB: sizeMB
     });
     
-    if (file.size > maxSize) {
-      console.error('❌ File too large:', file.size);
+    // Aviso para arquivos muito grandes (mas não bloqueia)
+    if (file.size > 50 * 1024 * 1024) { // 50MB
       toast({
-        title: "Arquivo muito grande",
-        description: `O arquivo tem ${(file.size / 1024 / 1024).toFixed(2)}MB. Máximo permitido: 50MB.`,
-        variant: "destructive"
+        title: "Arquivo grande detectado",
+        description: `Arquivo de ${sizeMB}MB pode levar vários minutos para processar. Aguarde...`,
+        duration: 5000
       });
-      return;
     }
 
     setIsUploading(true);
@@ -177,12 +175,21 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       
       console.log('📤 Preparing request:', requestData);
       
-      // Envia o CSV diretamente para a API com timeout maior
+      // Envia o CSV diretamente para a API com timeout longo para arquivos grandes
       const controller = new AbortController();
+      const timeoutMinutes = Math.max(5, Math.ceil(file.size / (1024 * 1024))); // 1 minuto por MB, mínimo 5 min
+      const timeoutMs = timeoutMinutes * 60 * 1000;
+      
       const timeoutId = setTimeout(() => {
-        console.error('⏰ Request timeout after 5 minutes');
+        console.error(`⏰ Request timeout after ${timeoutMinutes} minutes`);
         controller.abort();
-      }, 300000); // 5 minutos
+      }, timeoutMs);
+      
+      toast({
+        title: "Processando...",
+        description: `Enviando ${sizeMB}MB. Timeout em ${timeoutMinutes} minutos. Aguarde...`,
+        duration: 10000
+      });
       
       console.log('🌐 Sending request to /api/upload-csv...');
       const requestStart = Date.now();
@@ -227,30 +234,34 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         }
         
         if (response.status === 413) {
-          errorMessage = `❌ ARQUIVO MUITO GRANDE (${(file.size / 1024 / 1024).toFixed(2)}MB)\n\n` +
-                        `O Vercel limita uploads em 3-4MB. Soluções:\n` +
-                        `• Divida o CSV em arquivos menores\n` +
-                        `• Remova colunas desnecessárias\n` +
-                        `• Use compressão antes do upload`;
+          errorMessage = `❌ ARQUIVO MUITO GRANDE PARA O VERCEL\n\n` +
+                        `O arquivo de ${sizeMB}MB excedeu o limite da plataforma.\n\n` +
+                        `SOLUÇÕES:\n` +
+                        `• Use um servidor próprio sem limites\n` +
+                        `• Divida o CSV em partes menores\n` +
+                        `• Processe localmente primeiro\n\n` +
+                        `O sistema pode processar qualquer tamanho, mas o Vercel tem limitações.`;
         } else if (response.status === 500) {
-          errorMessage = `❌ ERRO INTERNO DO SERVIDOR (500)\n\n` +
+          errorMessage = `❌ ERRO NO PROCESSAMENTO\n\n` +
                         `Detalhes: ${errorData.details || errorData.message || 'Erro desconhecido'}\n\n` +
                         `Possíveis causas:\n` +
                         `• Problema na configuração do Supabase\n` +
                         `• Formato CSV incompatível\n` +
-                        `• Timeout no processamento\n\n` +
+                        `• Timeout no processamento de arquivo grande\n\n` +
                         `Erro técnico: ${errorData.supabaseError || errorData.error || 'N/A'}`;
         } else if (response.status === 400) {
           errorMessage = `❌ PROBLEMA NO ARQUIVO CSV\n\n` +
                         `${errorData.error || 'Formato inválido'}\n\n` +
                         `Verifique se:\n` +
-                        `• O arquivo tem as colunas corretas\n` +
+                        `• O arquivo tem as colunas corretas (chat_id, text, type)\n` +
                         `• Não está corrompido\n` +
-                        `• Está em formato CSV válido`;
+                        `• Está em formato CSV válido\n` +
+                        `• Tem dados além do cabeçalho`;
         } else {
           errorMessage = `❌ ERRO DESCONHECIDO (${response.status})\n\n` +
                         `${errorData.error || errorData.message || response.statusText}\n\n` +
                         `Status: ${response.status}\n` +
+                        `Tamanho do arquivo: ${sizeMB}MB\n` +
                         `Detalhes: ${JSON.stringify(errorData, null, 2)}`;
         }
         

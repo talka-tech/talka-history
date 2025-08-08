@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/upload-csv.ts": {
-      "maxDuration": 60,
+      "maxDuration": 300,
       "memory": 3008
     }
   },
