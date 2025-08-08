@@ -72,29 +72,33 @@ export default async function handler(req: any, res: any) {
 
     // Mapeia índices das colunas importantes - CORRIGIDO para estrutura real do WhatsApp
     const columnMap = {
-      message_id: 0,      // 590004
+      chat_id: 0,         // 590004 (ID da conversa real) ✅
       mobile_number: 1,   // +5513981925766
-      timestamp: 2,       // 2025-05-02 14:54:31
-      chat_id: 3,         // 3EB06C5B6994D89AB39602 (hash do chat)
+      chat_created: 2,    // 2025-05-02 14:54:31
+      message_id: 3,      // 3EB06C5B6994D89AB39602 (hash da mensagem individual)
       fromMe: 4,          // 1 ou 0
       type: 5,            // text
       direction: 6,       // OUTGOING/INCOMING
-      text: 7             // MENSAGEM REAL ✅
+      text: 7,            // MENSAGEM REAL ✅
+      media: 8,           // (vazio)
+      communication_mode: 9, // INBOX
+      message_created: 10 // 2025-05-02 14:54:31
     };
 
-    console.log('🗂️ Mapeamento de colunas (WhatsApp):', columnMap);
+    console.log('🗂️ Mapeamento de colunas (WhatsApp Real):', columnMap);
 
     // Debug: Mostra primeira linha de dados para análise
     if (lines.length > 1) {
       const firstDataLine = parseCSVLine(lines[1]);
       console.log('🔍 Primeira linha de dados (exemplo):', firstDataLine);
       console.log('🎯 Valores extraídos:');
-      console.log('  - chat_id:', firstDataLine[columnMap.chat_id]);
+      console.log('  - chat_id (CONVERSA):', firstDataLine[columnMap.chat_id]);
+      console.log('  - message_id (HASH):', firstDataLine[columnMap.message_id]);
       console.log('  - text:', firstDataLine[columnMap.text]);
       console.log('  - type:', firstDataLine[columnMap.type]);
       console.log('  - mobile_number:', firstDataLine[columnMap.mobile_number]);
       console.log('  - fromMe:', firstDataLine[columnMap.fromMe]);
-      console.log('  - timestamp:', firstDataLine[columnMap.timestamp]);
+      console.log('  - message_created:', firstDataLine[columnMap.message_created]);
     }
 
     // Valida se colunas essenciais existem (agora baseado em índices fixos)
@@ -123,12 +127,12 @@ export default async function handler(req: any, res: any) {
           continue;
         }
 
-        // Extrai dados usando índices corretos
+        // Extrai dados usando índices corretos da estrutura real
         const chat_id = values[columnMap.chat_id]?.trim()?.replace(/"/g, '') || 'unknown';
         const mobile_number = values[columnMap.mobile_number]?.trim()?.replace(/"/g, '') || '';
         const fromMe = values[columnMap.fromMe]?.trim()?.replace(/"/g, '') === '1';
         const rawText = values[columnMap.text]?.trim()?.replace(/"/g, '') || '';
-        const timestamp = values[columnMap.timestamp]?.trim()?.replace(/"/g, '') || new Date().toISOString();
+        const timestamp = values[columnMap.message_created]?.trim()?.replace(/"/g, '') || new Date().toISOString();
         const type = values[columnMap.type]?.trim()?.replace(/"/g, '')?.toLowerCase() || '';
 
         // Corrige caracteres especiais do WhatsApp (ÃªÃ¡Ã£ → êáã)
@@ -139,7 +143,7 @@ export default async function handler(req: any, res: any) {
           const sender = fromMe ? 'Você' : (mobile_number || 'Desconhecido');
           
           messages.push({
-            conversation_id: chat_id, // Mapeia chat_id para conversation_id
+            conversation_id: chat_id, // Agora usa o chat_id correto (coluna 0) ✅
             sender: sender,
             content: text,
             timestamp: timestamp,
