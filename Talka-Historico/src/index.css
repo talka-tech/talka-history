@@ -2,8 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Chat Storyteller Design System - Professional chat analysis interface
-All colors MUST be HSL. Focus on blues, purples with excellent contrast.
+/* Talka Design System - Paleta de cores baseada na identidade visual da Talka
+Roxo/Violeta principal com gradientes azuis/ciano para comunicação moderna
 */
 
 @layer base {
@@ -17,28 +17,37 @@ All colors MUST be HSL. Focus on blues, purples with excellent contrast.
     --popover: 0 0% 100%;
     --popover-foreground: 230 15% 15%;
 
-    --primary: 235 85% 55%;
+    /* Talka Primary - Roxo/Violeta principal da logo */
+    --primary: 270 85% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 240 100% 70%;
+    --primary-glow: 280 100% 70%;
 
-    /* Chat-specific colors */
-    --chat-primary: 235 85% 55%;
-    --chat-secondary: 260 60% 65%;
-    --chat-bubble-sent: 235 85% 55%;
+    /* Talka cores específicas baseadas na identidade visual */
+    --talka-purple: 270 85% 60%;
+    --talka-blue: 220 85% 60%;
+    --talka-cyan: 190 85% 60%;
+    --talka-gradient-start: 270 85% 60%;
+    --talka-gradient-end: 190 85% 60%;
+
+    /* Chat-specific colors com paleta Talka */
+    --chat-primary: 270 85% 60%;
+    --chat-secondary: 220 85% 60%;
+    --chat-bubble-sent: 270 85% 60%;
     --chat-bubble-received: 220 15% 95%;
     --chat-sidebar: 240 20% 96%;
-    --chat-header: 235 85% 55%;
+    --chat-header: 270 85% 60%;
 
-    /* Gradients for beautiful effects */
-    --gradient-primary: linear-gradient(135deg, hsl(235 85% 55%), hsl(260 60% 65%));
-    --gradient-subtle: linear-gradient(180deg, hsl(240 10% 98%), hsl(240 15% 96%));
-    --gradient-chat: linear-gradient(135deg, hsl(235 85% 55% / 0.1), hsl(260 60% 65% / 0.05));
+    /* Gradientes Talka - do roxo ao ciano */
+    --gradient-talka: linear-gradient(135deg, hsl(270 85% 60%), hsl(220 85% 60%), hsl(190 85% 60%));
+    --gradient-talka-subtle: linear-gradient(135deg, hsl(270 85% 60% / 0.1), hsl(190 85% 60% / 0.05));
+    --gradient-background: linear-gradient(135deg, hsl(240 10% 98%), hsl(270 10% 96%));
+    --gradient-header: linear-gradient(135deg, hsl(270 85% 60%), hsl(220 85% 60%));
 
-    /* Shadows with primary colors */
-    --shadow-elegant: 0 10px 30px -10px hsl(235 85% 55% / 0.2);
-    --shadow-glow: 0 0 30px hsl(240 100% 70% / 0.3);
+    /* Shadows com cores Talka */
+    --shadow-talka: 0 10px 30px -10px hsl(270 85% 60% / 0.2);
+    --shadow-glow-talka: 0 0 30px hsl(270 85% 60% / 0.3);
 
-    /* Animations */
+    /* Animações */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
@@ -48,34 +57,174 @@ All colors MUST be HSL. Focus on blues, purples with excellent contrast.
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 270 85% 95%;
+    --accent-foreground: 270 85% 20%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 270 20% 90%;
+    --input: 270 20% 95%;
+    --ring: 270 85% 60%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
+    /* Sidebar com tema Talka */
+    --sidebar-background: 270 10% 98%;
+    --sidebar-foreground: 270 15% 25%;
+    --sidebar-primary: 270 85% 60%;
     --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 270 20% 95%;
+    --sidebar-accent-foreground: 270 85% 20%;
+    --sidebar-border: 270 20% 90%;
+    --sidebar-ring: 270 85% 60%;
   }
+
+  .dark {
+    --background: 270 15% 8%;
+    --foreground: 270 5% 95%;
+
+    --card: 270 20% 10%;
+    --card-foreground: 270 5% 95%;
+
+    --popover: 270 20% 10%;
+    --popover-foreground: 270 5% 95%;
+
+    --primary: 270 85% 65%;
+    --primary-foreground: 270 15% 8%;
+
+    --secondary: 270 15% 15%;
+    --secondary-foreground: 270 5% 95%;
+
+    --muted: 270 15% 15%;
+    --muted-foreground: 270 5% 65%;
+
+    --accent: 270 20% 15%;
+    --accent-foreground: 270 5% 95%;
+
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 270 5% 95%;
+
+    --border: 270 20% 20%;
+    --input: 270 20% 20%;
+    --ring: 270 85% 65%;
+
+    --sidebar-background: 270 15% 8%;
+    --sidebar-foreground: 270 5% 95%;
+    --sidebar-primary: 270 85% 65%;
+    --sidebar-primary-foreground: 270 15% 8%;
+    --sidebar-accent: 270 20% 15%;
+    --sidebar-accent-foreground: 270 5% 95%;
+    --sidebar-border: 270 20% 20%;
+    --sidebar-ring: 270 85% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    background: var(--gradient-background);
+    min-height: 100vh;
+  }
+
+  /* Talka gradient utilities */
+  .gradient-talka {
+    background: var(--gradient-talka);
+  }
+
+  .gradient-talka-subtle {
+    background: var(--gradient-talka-subtle);
+  }
+
+  .gradient-header {
+    background: var(--gradient-header);
+  }
+
+  .shadow-talka {
+    box-shadow: var(--shadow-talka);
+  }
+
+  .shadow-glow-talka {
+    box-shadow: var(--shadow-glow-talka);
+  }
+
+  /* Talka button styles */
+  .btn-talka {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+    background: var(--gradient-talka);
+    transition: var(--transition-smooth);
+    box-shadow: var(--shadow-talka);
+  }
+
+  .btn-talka:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow-talka);
+  }
+
+  /* Talka card styles */
+  .card-talka {
+    @apply bg-card text-card-foreground border border-border;
+    background: linear-gradient(135deg, hsl(0 0% 100%), hsl(270 10% 98%));
+    border: 1px solid hsl(270 20% 90%);
+    box-shadow: var(--shadow-talka);
+    transition: var(--transition-smooth);
+  }
+
+  .card-talka:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-glow-talka);
+  }
+
+  /* Input styles with Talka theme */
+  .input-talka {
+    @apply bg-input border-border;
+    border: 2px solid hsl(270 20% 90%);
+    transition: var(--transition-smooth);
+  }
+
+  .input-talka:focus {
+    border-color: hsl(270 85% 60%);
+    box-shadow: 0 0 0 3px hsl(270 85% 60% / 0.1);
+  }
+
+  /* Chat bubble animations */
+  .chat-bubble-enter {
+    animation: bubbleEnter 0.3s ease-out;
+  }
+
+  @keyframes bubbleEnter {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Smooth scrollbar with Talka colors */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(270 10% 95%);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(270 85% 60%);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(270 85% 50%);
+  }
+}
 
   .dark {
     --background: 222.2 84% 4.9%;
@@ -108,20 +257,9 @@ All colors MUST be HSL. Focus on blues, purples with excellent contrast.
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 270 20% 15%;
+    --sidebar-accent-foreground: 270 5% 95%;
+    --sidebar-border: 270 20% 20%;
+    --sidebar-ring: 270 85% 65%;
   }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-  }
-}

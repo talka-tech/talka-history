@@ -108,7 +108,17 @@ function App() {
                 path="/admin" 
                 element={
                   isAuthenticated && isAdmin ? (
-                    <AdminPanel onLogout={handleLogout} />
+                    <AdminPanel 
+                      onLogout={handleLogout} 
+                      user={{
+                        id: currentUserId || 0,
+                        username: currentUser,
+                        password: '',
+                        created_at: '',
+                        status: 'active',
+                        user_type: 'admin'
+                      }}
+                    />
                   ) : (
                     <Navigate to="/login" replace />
                   )
