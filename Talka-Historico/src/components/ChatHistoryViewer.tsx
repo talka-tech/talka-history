@@ -78,6 +78,74 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     }
   }, [currentUserId, fetchConversations]);
 
+  // **FUNÇÃO PARA UPLOAD EM CHUNKS - SOLUÇÃO PARA ERRO 413**
+  const uploadFileInChunks = async (fileContent: string, userId: number): Promise<boolean> => {
+    try {
+      const CHUNK_SIZE = 1024 * 1024; // 1MB chunks para evitar erro 413
+      const totalChunks = Math.ceil(fileContent.length / CHUNK_SIZE);
+      
+      console.log(`[CHUNK UPLOAD] Iniciando upload de ${totalChunks} chunks de 1MB`);
+      
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, fileContent.length);
+        const chunk = fileContent.slice(start, end);
+        const isLastChunk = i === totalChunks - 1;
+        
+        console.log(`[CHUNK ${i + 1}/${totalChunks}] Tamanho: ${chunk.length} caracteres`);
+        
+        toast({
+          title: `Enviando pedaço ${i + 1} de ${totalChunks}`,
+          description: `Progresso: ${Math.round(((i + 1) / totalChunks) * 100)}%`,
+          duration: 2000
+        });
+        
+        const response = await fetch('/api/upload-csv-chunk', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chunk: chunk,
+            chunkIndex: i,
+            totalChunks: totalChunks,
+            isLastChunk: isLastChunk,
+            userId: userId
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error(`[CHUNK ${i + 1}] Erro HTTP ${response.status}:`, errorData);
+          throw new Error(`Falha no pedaço ${i + 1}: ${response.status} - ${errorData}`);
+        }
+        
+        const result = await response.json();
+        console.log(`[CHUNK ${i + 1}] Sucesso:`, result);
+        
+        if (isLastChunk && result.totalProcessed) {
+          toast({
+            title: "🎉 Upload completo!",
+            description: `${result.totalProcessed} mensagens processadas com sucesso`,
+            variant: "default",
+            duration: 10000
+          });
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('[CHUNK UPLOAD ERROR]:', error);
+      toast({
+        title: "Erro no upload",
+        description: error instanceof Error ? error.message : "Erro desconhecido durante upload em pedaços",
+        variant: "destructive",
+        duration: 10000
+      });
+      return false;
+    }
+  };
+
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -89,7 +157,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       lastModified: new Date(file.lastModified).toISOString()
     });
 
-    // Verificar se é um arquivo CSV
+    // Verificar se é um arquivo CSV (verificação dupla)
     const isCSV = file.name.toLowerCase().endsWith('.csv') || 
                   file.type === 'text/csv' || 
                   file.type === 'application/csv';
@@ -104,20 +172,22 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return;
     }
 
-    // Log do arquivo sem limite de tamanho
-    const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+    // Verificar o tamanho do arquivo (máximo 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     console.log('📊 File size check:', {
       fileSize: file.size,
-      sizeMB: sizeMB
+      maxSize: maxSize,
+      sizeMB: (file.size / 1024 / 1024).toFixed(2)
     });
     
-    // Aviso para arquivos muito grandes (mas não bloqueia)
-    if (file.size > 50 * 1024 * 1024) { // 50MB
+    if (file.size > maxSize) {
+      console.error('❌ File too large:', file.size);
       toast({
-        title: "Arquivo grande detectado",
-        description: `Arquivo de ${sizeMB}MB pode levar vários minutos para processar. Aguarde...`,
-        duration: 5000
+        title: "Arquivo muito grande",
+        description: `O arquivo tem ${(file.size / 1024 / 1024).toFixed(2)}MB. Máximo permitido: 50MB.`,
+        variant: "destructive"
       });
+      return;
     }
 
     setIsUploading(true);
@@ -175,25 +245,41 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       
       console.log('📤 Preparing request:', requestData);
       
-      // Envia o CSV diretamente para a API com timeout longo para arquivos grandes
+      // Envia o CSV diretamente para a API com timeout maior
       const controller = new AbortController();
-      const timeoutMinutes = Math.max(5, Math.ceil(file.size / (1024 * 1024))); // 1 minuto por MB, mínimo 5 min
-      const timeoutMs = timeoutMinutes * 60 * 1000;
-      
       const timeoutId = setTimeout(() => {
-        console.error(`⏰ Request timeout after ${timeoutMinutes} minutes`);
+        console.error('⏰ Request timeout after 5 minutes');
         controller.abort();
-      }, timeoutMs);
-      
-      toast({
-        title: "Processando...",
-        description: `Enviando ${sizeMB}MB. Timeout em ${timeoutMinutes} minutos. Aguarde...`,
-        duration: 10000
-      });
+      }, 300000); // 5 minutos
       
       console.log('🌐 Sending request to /api/upload-csv...');
       const requestStart = Date.now();
       
+      // **DECISÃO: Se arquivo > 3MB, usar chunks para evitar 413**
+      const isLargeFile = file.size > 3 * 1024 * 1024; // 3MB
+      
+      if (isLargeFile) {
+        console.log('📦 Arquivo grande detectado, usando upload em chunks...');
+        
+        toast({
+          title: "Arquivo grande detectado",
+          description: `Usando upload em pedaços para evitar erro 413...`,
+          duration: 3000
+        });
+        
+        // Usar API de chunks
+        const success = await uploadFileInChunks(text, currentUserId);
+        
+        if (success) {
+          // Atualiza a lista de conversas
+          fetchConversations();
+          return; // Sai da função se sucesso
+        } else {
+          throw new Error('Falha no upload por chunks');
+        }
+      }
+      
+      // Upload normal para arquivos pequenos
       const response = await fetch('/api/upload-csv', {
         method: 'POST',
         headers: { 
@@ -234,34 +320,30 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         }
         
         if (response.status === 413) {
-          errorMessage = `❌ ARQUIVO MUITO GRANDE PARA O VERCEL\n\n` +
-                        `O arquivo de ${sizeMB}MB excedeu o limite da plataforma.\n\n` +
-                        `SOLUÇÕES:\n` +
-                        `• Use um servidor próprio sem limites\n` +
-                        `• Divida o CSV em partes menores\n` +
-                        `• Processe localmente primeiro\n\n` +
-                        `O sistema pode processar qualquer tamanho, mas o Vercel tem limitações.`;
+          errorMessage = `❌ ARQUIVO MUITO GRANDE (${(file.size / 1024 / 1024).toFixed(2)}MB)\n\n` +
+                        `O Vercel limita uploads em 3-4MB. Soluções:\n` +
+                        `• Divida o CSV em arquivos menores\n` +
+                        `• Remova colunas desnecessárias\n` +
+                        `• Use compressão antes do upload`;
         } else if (response.status === 500) {
-          errorMessage = `❌ ERRO NO PROCESSAMENTO\n\n` +
+          errorMessage = `❌ ERRO INTERNO DO SERVIDOR (500)\n\n` +
                         `Detalhes: ${errorData.details || errorData.message || 'Erro desconhecido'}\n\n` +
                         `Possíveis causas:\n` +
                         `• Problema na configuração do Supabase\n` +
                         `• Formato CSV incompatível\n` +
-                        `• Timeout no processamento de arquivo grande\n\n` +
+                        `• Timeout no processamento\n\n` +
                         `Erro técnico: ${errorData.supabaseError || errorData.error || 'N/A'}`;
         } else if (response.status === 400) {
           errorMessage = `❌ PROBLEMA NO ARQUIVO CSV\n\n` +
                         `${errorData.error || 'Formato inválido'}\n\n` +
                         `Verifique se:\n` +
-                        `• O arquivo tem as colunas corretas (chat_id, text, type)\n` +
+                        `• O arquivo tem as colunas corretas\n` +
                         `• Não está corrompido\n` +
-                        `• Está em formato CSV válido\n` +
-                        `• Tem dados além do cabeçalho`;
+                        `• Está em formato CSV válido`;
         } else {
           errorMessage = `❌ ERRO DESCONHECIDO (${response.status})\n\n` +
                         `${errorData.error || errorData.message || response.statusText}\n\n` +
                         `Status: ${response.status}\n` +
-                        `Tamanho do arquivo: ${sizeMB}MB\n` +
                         `Detalhes: ${JSON.stringify(errorData, null, 2)}`;
         }
         
