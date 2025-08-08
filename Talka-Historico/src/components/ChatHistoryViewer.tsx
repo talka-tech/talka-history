@@ -961,11 +961,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         <h3 className="font-medium text-sm truncate flex-1 text-white pr-8">
                             {conversation.title || 'Conversa sem título'}
                         </h3>
-                        <span className="text-xs text-purple-300 ml-2 flex-shrink-0">
-                            {conversation.lastTimestamp && conversation.lastTimestamp !== 'Invalid Date' 
-                              ? new Date(conversation.lastTimestamp).toLocaleDateString('pt-BR') 
-                              : ''}
-                        </span>
                         </div>
                         <p className="text-xs text-purple-200 mb-2 truncate">
                         {conversation.lastMessage || 'Nenhuma mensagem'}
@@ -977,6 +972,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             {conversation.messageCount || conversation.messages?.length || 0}
                             </Badge>
                         </div>
+                        <span className="text-xs text-purple-300">
+                            {conversation.lastTimestamp && conversation.lastTimestamp !== 'Invalid Date' 
+                              ? new Date(conversation.lastTimestamp).toLocaleDateString('pt-BR') 
+                              : ''}
+                        </span>
                         </div>
                     </Card>
                     ))}
