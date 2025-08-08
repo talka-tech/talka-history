@@ -121,13 +121,12 @@ export default async function handler(req: any, res: any) {
           const sender = fromMe ? 'Você' : (mobile_number || 'Desconhecido');
           
           messages.push({
-            chat_id: chat_id,
+            conversation_id: chat_id, // Mapeia chat_id para conversation_id
             sender: sender,
             content: text,
             timestamp: timestamp,
             from_me: fromMe,
-            user_id: parseInt(userId),
-            mobile_number: mobile_number
+            user_id: parseInt(userId)
           });
           
           processedCount++;
@@ -152,14 +151,84 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Nenhuma mensagem válida encontrada no CSV' });
     }
 
-    // Salva no Supabase em batches de 1000
+    // ETAPA 1: Agrupar mensagens por chat_id e criar conversas
+    console.log('📋 Agrupando mensagens por conversa...');
+    const conversationGroups: { [chatId: string]: any[] } = {};
+    
+    messages.forEach((msg: any) => {
+      const chatId = msg.conversation_id; // chat_id original do CSV
+      if (!conversationGroups[chatId]) {
+        conversationGroups[chatId] = [];
+      }
+      conversationGroups[chatId].push(msg);
+    });
+
+    const chatIds = Object.keys(conversationGroups);
+    console.log(`� Encontradas ${chatIds.length} conversas distintas`);
+
+    // ETAPA 2: Criar conversas na tabela conversations
+    console.log('🏗️ Criando conversas no banco...');
+    const conversationsToCreate = chatIds.map(chatId => {
+      const msgs = conversationGroups[chatId];
+      const participants = [...new Set(msgs.map((m: any) => m.sender))];
+      const phoneNumbers = participants.filter(p => p !== 'Você');
+      
+      const title = phoneNumbers.length > 0 
+        ? `${phoneNumbers[0]} ${phoneNumbers.length > 1 ? `+${phoneNumbers.length - 1} outros` : ''}`
+        : `Conversa ${chatId}`;
+
+      return {
+        title: title,
+        user_id: parseInt(userId)
+      };
+    });
+
+    // Insere conversas
+    const conversationsResponse = await fetch(`${supabaseUrl}/rest/v1/conversations`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(conversationsToCreate)
+    });
+
+    if (!conversationsResponse.ok) {
+      const errorText = await conversationsResponse.text();
+      console.error(`❌ Erro ao criar conversas:`, errorText);
+      throw new Error(`Erro ao criar conversas: ${conversationsResponse.status} - ${errorText}`);
+    }
+
+    const createdConversations = await conversationsResponse.json();
+    console.log(`✅ Criadas ${createdConversations.length} conversas`);
+
+    // ETAPA 3: Mapear chat_id para conversation_id real
+    const chatIdToConversationId: { [chatId: string]: number } = {};
+    chatIds.forEach((chatId, index) => {
+      chatIdToConversationId[chatId] = createdConversations[index].id;
+    });
+
+    // ETAPA 4: Preparar mensagens com conversation_id correto
+    console.log('📝 Preparando mensagens para inserção...');
+    const messagesForDatabase = messages.map((msg: any) => ({
+      conversation_id: chatIdToConversationId[msg.conversation_id], // ID real da conversa
+      timestamp: msg.timestamp,
+      sender: msg.sender,
+      content: msg.content,
+      fromMe: msg.from_me
+    }));
+
+    // ETAPA 5: Salvar mensagens em batches
+    console.log('💾 Salvando mensagens no banco...');
     const BATCH_SIZE = 1000;
     let savedCount = 0;
 
-    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
-      const batch = messages.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < messagesForDatabase.length; i += BATCH_SIZE) {
+      const batch = messagesForDatabase.slice(i, i + BATCH_SIZE);
       
-      console.log(`💾 Salvando batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(messages.length/BATCH_SIZE)} (${batch.length} mensagens)`);
+      console.log(`💾 Salvando batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(messagesForDatabase.length/BATCH_SIZE)} (${batch.length} mensagens)`);
 
       const response = await fetch(`${supabaseUrl}/rest/v1/messages`, {
         method: 'POST',
@@ -179,33 +248,18 @@ export default async function handler(req: any, res: any) {
       }
 
       savedCount += batch.length;
-      console.log(`✅ Batch salvo: ${savedCount}/${messages.length} mensagens`);
+      console.log(`✅ Batch salvo: ${savedCount}/${messagesForDatabase.length} mensagens`);
     }
-
-    // Calcula estatísticas das conversas
-    const conversationStats: any = {};
-    messages.forEach((msg: any) => {
-      if (!conversationStats[msg.chat_id]) {
-        conversationStats[msg.chat_id] = {
-          messageCount: 0,
-          participants: new Set()
-        };
-      }
-      conversationStats[msg.chat_id].messageCount++;
-      conversationStats[msg.chat_id].participants.add(msg.sender);
-    });
-
-    const totalConversations = Object.keys(conversationStats).length;
 
     console.log('🎉 Upload concluído com sucesso!');
 
     // Resposta final
     return res.status(200).json({
       success: true,
-      processed: totalConversations,
+      processed: createdConversations.length,
       totalMessages: savedCount,
       errorLines: errorCount,
-      conversations: totalConversations,
+      conversations: createdConversations.length,
       timestamp: new Date().toISOString()
     });
 
