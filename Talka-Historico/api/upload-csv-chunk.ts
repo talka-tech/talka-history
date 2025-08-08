@@ -2,7 +2,7 @@ export default async function handler(request: Request): Promise<Response> {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-user-id, x-chunk-index, x-total-chunks, x-upload-id',
+    'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
   };
 
@@ -20,13 +20,18 @@ export default async function handler(request: Request): Promise<Response> {
   console.log('🚀 Iniciando processamento de chunk CSV');
 
   try {
-    // Headers do chunk
-    const userId = request.headers.get('x-user-id');
-    const chunkIndex = parseInt(request.headers.get('x-chunk-index') || '0');
-    const totalChunks = parseInt(request.headers.get('x-total-chunks') || '1');
-    const uploadId = request.headers.get('x-upload-id') || Date.now().toString();
+    // Ler dados do body JSON
+    const body = await request.json();
+    const { chunk, chunkIndex, totalChunks, isLastChunk, userId } = body;
+    const uploadId = `upload_${userId}_${Date.now()}`;
 
-    console.log('📦 Chunk info:', { userId, chunkIndex, totalChunks, uploadId });
+    console.log('📦 Chunk info:', { 
+      userId, 
+      chunkIndex: chunkIndex + 1, 
+      totalChunks, 
+      isLastChunk,
+      chunkSize: chunk?.length || 0
+    });
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID obrigatório' }), {
@@ -35,16 +40,14 @@ export default async function handler(request: Request): Promise<Response> {
       });
     }
 
-    // Ler conteúdo do chunk
-    const chunkContent = await request.text();
-    console.log('📄 Chunk recebido:', chunkContent.length, 'caracteres');
-
-    if (!chunkContent.trim()) {
+    if (!chunk || !chunk.trim()) {
       return new Response(JSON.stringify({ error: 'Chunk vazio' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    console.log('📄 Chunk recebido:', chunk.length, 'caracteres');
 
     // Configurar Supabase
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -58,7 +61,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     // Processar linhas do chunk
-    const lines = chunkContent.split('\n').filter(line => line.trim());
+    const lines = chunk.split('\n').filter(line => line.trim());
     console.log('📝 Linhas no chunk:', lines.length);
 
     // Se é o primeiro chunk, pular header
@@ -213,8 +216,6 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     // Resposta do chunk
-    const isLastChunk = chunkIndex === totalChunks - 1;
-    
     return new Response(JSON.stringify({
       success: true,
       message: isLastChunk ? 'Upload completo!' : `Chunk ${chunkIndex + 1}/${totalChunks} processado`,
