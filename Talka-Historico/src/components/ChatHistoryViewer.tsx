@@ -86,13 +86,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     
     try {
       const text = await file.text();
-      const processedConversations = parseCSVToConversations(text);
       
-      // Envia para a API para salvar no banco de dados
-      const response = await fetch('/api/upload-chat', {
+      // Envia o CSV diretamente para a API (não processado)
+      const response = await fetch('/api/upload-csv', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversations: processedConversations, userId: currentUserId })
+        headers: { 
+          'Content-Type': 'text/plain',
+          'x-user-id': currentUserId.toString()
+        },
+        body: text
       });
 
       if (!response.ok) {
@@ -100,12 +102,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         throw new Error(errorData.error || 'Falha ao salvar o histórico.');
       }
 
-      // Atualiza a lista de conversas com os dados do arquivo enviado
+      const result = await response.json();
+      
+      // Atualiza a lista de conversas
       fetchConversations();
       
       toast({
         title: "Sucesso!",
-        description: `${processedConversations.length} conversas foram salvas.`,
+        description: result.message || "Conversas foram salvas com sucesso.",
       });
     } catch (error) {
       toast({

@@ -18,11 +18,16 @@ export default async function handler(request: Request) {
   try {
     const { username, password } = await request.json();
 
-    // --- MUDANÇA PARA TESTE ---
-    // Vamos procurar o utilizador, mas ignorar a senha por agora
+    if (!username || !password) {
+      return new Response(JSON.stringify({ error: 'Username and password are required' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Buscar o usuário com a senha
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, username, status')
+      .select('id, username, password, status, user_type')
       .eq('username', username)
       .limit(1);
 
@@ -31,19 +36,32 @@ export default async function handler(request: Request) {
     }
 
     if (!users || users.length === 0) {
-      // Se o utilizador não for encontrado, as credenciais são inválidas
-      return new Response(JSON.stringify({ error: 'User not found' }), {
+      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
         status: 401, headers: { 'Content-Type': 'application/json' },
       });
     }
 
     const user = users[0];
 
-    // Se o utilizador existir, vamos simplesmente permitir o login (APENAS PARA TESTE)
+    // Verificar se o usuário está ativo
+    if (user.status !== 'active') {
+      return new Response(JSON.stringify({ error: 'User account is inactive' }), {
+        status: 401, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verificar a senha (comparação simples)
+    if (user.password !== password) {
+      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+        status: 401, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Login bem-sucedido
     return new Response(JSON.stringify({
       id: user.id,
       username: user.username,
-      isAdmin: user.username === 'admin',
+      isAdmin: user.user_type === 'admin' || user.username === 'admin',
     }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     });

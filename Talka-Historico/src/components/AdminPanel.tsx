@@ -6,15 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, Plus, Trash2, LogOut } from 'lucide-react';
+import { Users, Plus, Trash2, LogOut, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-// A interface agora reflete os dados do banco, sem a senha
+// A interface agora inclui a senha e tipo de usuário
 interface User {
-  id: number; // O banco de dados gera um ID numérico
+  id: number;
   username: string;
+  password: string;
   created_at: string;
   status: 'active' | 'inactive';
+  user_type?: string;
 }
 
 interface AdminPanelProps {
@@ -27,6 +29,7 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
   const [newUser, setNewUser] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set());
 
   // Função para buscar usuários da API
   const fetchUsers = useCallback(async () => {
@@ -137,6 +140,18 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
+    });
+  };
+
+  const togglePasswordVisibility = (userId: number) => {
+    setVisiblePasswords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
     });
   };
 
@@ -268,6 +283,7 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Usuário</TableHead>
+                  <TableHead>Senha</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Criado em</TableHead>
                   <TableHead>Ações</TableHead>
@@ -275,11 +291,29 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
               </TableHeader>
               <TableBody>
                 {isFetching ? (
-                    <TableRow><TableCell colSpan={4} className="text-center">Carregando...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
                 ) : (
                     users.map((user) => (
                     <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.username}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm">
+                              {visiblePasswords.has(user.id) ? user.password : '••••••••'}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => togglePasswordVisibility(user.id)}
+                              className="h-6 w-6 p-0"
+                            >
+                              {visiblePasswords.has(user.id) ? 
+                                <EyeOff className="w-3 h-3" /> : 
+                                <Eye className="w-3 h-3" />
+                              }
+                            </Button>
+                          </div>
+                        </TableCell>
                         <TableCell>
                         <Badge 
                             variant={user.status === 'active' ? 'default' : 'secondary'}

@@ -20,7 +20,7 @@ export default async function handler(request: Request) {
   try {
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, username, status, created_at')
+      .select('id, username, password, status, created_at, user_type')
       .order('created_at', { ascending: true });
 
     if (error) {
