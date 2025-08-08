@@ -9,9 +9,10 @@ export const config = {
   maxDuration: 300, // 5 minutos
   api: {
     bodyParser: {
-      sizeLimit: '50mb', // Aumentar limite para 50MB
+      sizeLimit: '100mb', // Aumentar limite drasticamente
     },
-    responseLimit: false,
+    responseLimit: '100mb',
+    externalResolver: true,
   },
 };
 
@@ -33,6 +34,13 @@ interface Conversation {
 }
 
 export default async function handler(request: Request) {
+  const startTime = Date.now();
+  console.log('🚀 Upload CSV API called:', {
+    method: request.method,
+    url: request.url,
+    timestamp: new Date().toISOString()
+  });
+
   // Headers CORS para permitir requisições
   const headers = {
     'Content-Type': 'application/json',
@@ -42,33 +50,51 @@ export default async function handler(request: Request) {
   };
 
   if (request.method === 'OPTIONS') {
+    console.log('✅ OPTIONS preflight handled');
     return new Response(null, { status: 200, headers });
   }
 
   if (request.method !== 'POST') {
+    console.error('❌ Invalid method:', request.method);
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405, 
       headers,
     });
   }
 
+  // Log request headers
+  const requestHeaders = {};
+  request.headers.forEach((value, key) => {
+    requestHeaders[key] = value;
+  });
+  console.log('📋 Request headers:', requestHeaders);
+
   const userId = request.headers.get('x-user-id');
   if (!userId) {
+    console.error('❌ Missing user ID in headers');
     return new Response(JSON.stringify({ error: 'User ID is required' }), {
       status: 401, 
       headers,
     });
   }
 
+  console.log(`👤 Processing for user ${userId}`);
+
   try {
-    console.log(`Starting CSV processing for user ${userId}`);
+    console.log(`📥 Starting CSV processing for user ${userId}`);
     
     // Ler o conteúdo do arquivo com melhor tratamento de erro
+    console.log('📖 Reading request body...');
     let csvText = '';
     try {
       csvText = await request.text();
+      console.log('✅ Request body read successfully:', {
+        contentLength: csvText.length,
+        sizeKB: (csvText.length / 1024).toFixed(2),
+        firstLine: csvText.split('\n')[0]?.substring(0, 100) + '...'
+      });
     } catch (error) {
-      console.error('Error reading request body:', error);
+      console.error('❌ Error reading request body:', error);
       return new Response(JSON.stringify({ error: 'Failed to read file content. File might be too large or corrupted.' }), {
         status: 400, 
         headers,
@@ -76,18 +102,45 @@ export default async function handler(request: Request) {
     }
     
     if (!csvText || csvText.trim().length === 0) {
+      console.error('❌ Empty CSV file received');
       return new Response(JSON.stringify({ error: 'Empty CSV file' }), {
         status: 400, 
         headers,
       });
     }
 
-    console.log(`Processing CSV with ${csvText.length} characters for user ${userId}`);
+    // Verificar tamanho do conteúdo
+    const contentSizeMB = csvText.length / (1024 * 1024);
+    console.log(`📊 CSV size: ${contentSizeMB.toFixed(2)} MB`);
+    
+    if (contentSizeMB > 50) {
+      console.error(`❌ CSV too large: ${contentSizeMB.toFixed(2)} MB`);
+      return new Response(JSON.stringify({ 
+        error: `Arquivo muito grande: ${contentSizeMB.toFixed(2)} MB. Máximo permitido: 50 MB.` 
+      }), {
+        status: 413, 
+        headers,
+      });
+    }
+
+    console.log(`📈 Processing CSV with ${csvText.length} characters for user ${userId}`);
     
     // Para arquivos grandes, processar de forma mais otimizada
-    const conversations = parseCSVToConversations(csvText);
+    let conversations;
+    try {
+      conversations = parseCSVToConversations(csvText);
+    } catch (parseError) {
+      console.error('❌ Error parsing CSV:', parseError);
+      return new Response(JSON.stringify({ 
+        error: 'Erro ao processar CSV: ' + parseError.message 
+      }), {
+        status: 400, 
+        headers,
+      });
+    }
     
     if (conversations.length === 0) {
+      console.error('❌ No valid conversations found');
       return new Response(JSON.stringify({ error: 'No valid conversations found in CSV' }), {
         status: 400, 
         headers,

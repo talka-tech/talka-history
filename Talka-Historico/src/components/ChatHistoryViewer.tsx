@@ -82,10 +82,23 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
+    console.log('📁 File selected:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
+
+    // Verificar se é um arquivo CSV (verificação dupla)
+    const isCSV = file.name.toLowerCase().endsWith('.csv') || 
+                  file.type === 'text/csv' || 
+                  file.type === 'application/csv';
+    
+    if (!isCSV) {
+      console.error('❌ File validation failed: Not a CSV file');
       toast({
         title: "Erro no arquivo",
-        description: "Por favor, selecione um arquivo CSV.",
+        description: "Por favor, selecione apenas arquivos CSV (.csv).",
         variant: "destructive"
       });
       return;
@@ -93,33 +106,86 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
     // Verificar o tamanho do arquivo (máximo 50MB)
     const maxSize = 50 * 1024 * 1024; // 50MB
+    console.log('📊 File size check:', {
+      fileSize: file.size,
+      maxSize: maxSize,
+      sizeMB: (file.size / 1024 / 1024).toFixed(2)
+    });
+    
     if (file.size > maxSize) {
+      console.error('❌ File too large:', file.size);
       toast({
         title: "Arquivo muito grande",
-        description: "O arquivo deve ter no máximo 50MB. Tente dividir em arquivos menores.",
+        description: `O arquivo tem ${(file.size / 1024 / 1024).toFixed(2)}MB. Máximo permitido: 50MB.`,
         variant: "destructive"
       });
       return;
     }
 
     setIsUploading(true);
+    console.log('🚀 Starting upload process...');
     
     try {
       toast({
-        title: "Processando...",
-        description: "Lendo arquivo CSV, por favor aguarde...",
+        title: "Validando arquivo...",
+        description: "Verificando formato CSV e estrutura dos dados...",
       });
 
+      console.log('📖 Reading file content...');
       const text = await file.text();
+      console.log('✅ File read successfully:', {
+        contentLength: text.length,
+        lines: text.split('\n').length,
+        firstLine: text.split('\n')[0]?.substring(0, 100) + '...'
+      });
+
+      // Validar estrutura do CSV
+      const lines = text.split('\n').filter(line => line.trim());
+      if (lines.length < 2) {
+        throw new Error('Arquivo CSV vazio ou com apenas cabeçalho. Certifique-se de que há dados no arquivo.');
+      }
+
+      const headers = lines[0].toLowerCase();
+      const requiredColumns = ['chat_id', 'text', 'type'];
+      const missingColumns = requiredColumns.filter(col => !headers.includes(col));
       
+      if (missingColumns.length > 0) {
+        throw new Error(`Colunas obrigatórias ausentes no CSV: ${missingColumns.join(', ')}. Verifique se o arquivo tem as colunas corretas.`);
+      }
+
+      console.log('✅ CSV validation passed:', {
+        totalLines: lines.length,
+        headers: headers,
+        dataLines: lines.length - 1
+      });
+
       toast({
         title: "Enviando...",
-        description: "Enviando dados para o servidor, isso pode levar alguns minutos...",
+        description: `Enviando ${(file.size / 1024 / 1024).toFixed(2)}MB para o servidor. Isso pode levar alguns minutos...`,
       });
+      
+      // Preparar dados de envio
+      const requestData = {
+        url: '/api/upload-csv',
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'text/plain',
+          'x-user-id': currentUserId.toString()
+        },
+        bodySize: text.length
+      };
+      
+      console.log('📤 Preparing request:', requestData);
       
       // Envia o CSV diretamente para a API com timeout maior
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutos
+      const timeoutId = setTimeout(() => {
+        console.error('⏰ Request timeout after 5 minutes');
+        controller.abort();
+      }, 300000); // 5 minutos
+      
+      console.log('🌐 Sending request to /api/upload-csv...');
+      const requestStart = Date.now();
       
       const response = await fetch('/api/upload-csv', {
         method: 'POST',
@@ -131,17 +197,53 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         signal: controller.signal
       });
 
+      const requestTime = Date.now() - requestStart;
+      console.log('📡 Request completed:', {
+        status: response.status,
+        statusText: response.statusText,
+        responseTime: `${requestTime}ms`,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        console.error('❌ Response not OK:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+        
         if (response.status === 413) {
-          throw new Error('Arquivo muito grande. Tente dividir em arquivos menores (máximo 50MB).');
+          console.error('🚫 Payload too large (413):', {
+            fileSize: file.size,
+            contentLength: text.length,
+            sizeMB: (file.size / 1024 / 1024).toFixed(2)
+          });
+          throw new Error(`Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(2)}MB). O servidor não conseguiu processar. Tente dividir em arquivos menores ou reduzir o conteúdo.`);
         }
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao salvar o histórico.');
+        
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('📄 Error response data:', errorData);
+        } catch (parseError) {
+          console.error('❌ Failed to parse error response:', parseError);
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
+        throw new Error(errorData.error || `Erro HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      console.log('✅ Response OK, parsing result...');
+      let result;
+      try {
+        result = await response.json();
+        console.log('📊 Upload result:', result);
+      } catch (parseError) {
+        console.error('❌ Failed to parse success response:', parseError);
+        throw new Error('Resposta do servidor inválida');
+      }
       
       // Atualiza a lista de conversas
       fetchConversations();
