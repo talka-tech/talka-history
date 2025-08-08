@@ -84,7 +84,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     try {
       setIsDeletingData(true);
       
-      const response = await fetch('/api/clear-data', {
+      console.log('🗑️ Iniciando limpeza de dados para usuário:', currentUserId);
+      
+      const response = await fetch('/api/clear-data-supabase', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -94,12 +96,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         })
       });
 
+      console.log('📡 Response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao limpar dados');
+        console.error('❌ Erro na response:', errorData);
+        throw new Error(errorData.error || errorData.details || 'Falha ao limpar dados');
       }
 
       const result = await response.json();
+      console.log('✅ Resultado da limpeza:', result);
       
       // Atualiza o estado local
       setConversations([]);
@@ -114,8 +120,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         duration: 5000
       });
       
+      // Força uma nova busca para confirmar que está vazio
+      console.log('🔄 Fazendo nova busca para confirmar limpeza...');
+      setTimeout(() => {
+        fetchConversations();
+      }, 1000);
+      
     } catch (error) {
-      console.error('Erro ao limpar dados:', error);
+      console.error('❌ Erro ao limpar dados:', error);
       toast({
         title: "Erro",
         description: error.message || "Não foi possível limpar os dados. Tente novamente.",
@@ -124,7 +136,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     } finally {
       setIsDeletingData(false);
     }
-  }, [currentUserId, toast]);
+  }, [currentUserId, toast, fetchConversations]);
 
   // Busca as conversas quando o componente carrega
   useEffect(() => {
