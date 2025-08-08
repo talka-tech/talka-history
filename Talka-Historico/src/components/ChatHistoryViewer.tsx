@@ -112,12 +112,17 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
           duration: 1500
         });
         
-        // Timeout específico para cada chunk (2 minutos)
+        // Timeout específico para cada chunk (5 minutos)
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
-          console.error(`⏰ Chunk ${i + 1} timeout após 2 minutos`);
+          console.error(`⏰ Chunk ${i + 1} timeout após 5 minutos`);
           controller.abort();
-        }, 120000); // 2 minutos por chunk
+        }, 300000); // 5 minutos por chunk
+        
+        // Marca tempo de início do chunk
+        const chunkStartTime = Date.now();
+        
+        console.log(`[CHUNK ${i + 1}] Enviando para /api/upload-csv-fast...`);
         
         const response = await fetch('/api/upload-csv-fast', {
           method: 'POST',
@@ -135,6 +140,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         });
         
         clearTimeout(timeoutId);
+        const chunkProcessTime = Date.now() - chunkStartTime;
         
         if (!response.ok) {
           const errorData = await response.text();
@@ -143,18 +149,37 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         }
         
         const result = await response.json();
-        console.log(`[CHUNK ${i + 1}] Sucesso:`, result);
+        console.log(`[CHUNK ${i + 1}] Processado em ${chunkProcessTime}ms:`, result);
         
-        if (isLastChunk && result.totalProcessed) {
+        // Atualiza progresso com detalhes em tempo real
+        const newProgress = {
+          current: i + 1,
+          total: totalChunks,
+          message: `✅ Chunk ${i + 1}/${totalChunks}: ${result.messagesFound || 0} mensagens de ${result.linesProcessed || 0} linhas (${(chunkProcessTime/1000).toFixed(1)}s)`
+        };
+        setUploadProgress(newProgress);
+        
+        // Toast com informações detalhadas 
+        toast({
+          title: `✅ Chunk ${i + 1} processado`,
+          description: `${result.messagesFound || 0} mensagens salvas • ${result.linesProcessed || 0} linhas • ${(chunkProcessTime/1000).toFixed(1)}s`,
+          duration: 2000
+        });
+        
+        if (isLastChunk) {
+          // Calcula total de mensagens processadas
+          let totalMessages = 0;
+          // Aqui você pode somar de todos os chunks se quiser
+          
           setUploadProgress({ 
             current: totalChunks, 
             total: totalChunks, 
-            message: `✅ Concluído! ${result.totalProcessed} mensagens processadas` 
+            message: `🎉 Upload completo! Processamento finalizado com sucesso` 
           });
           
           toast({
             title: "🎉 Upload completo!",
-            description: `${result.totalProcessed} mensagens processadas com sucesso`,
+            description: `Arquivo processado com sucesso! Atualizando lista de conversas...`,
             variant: "default",
             duration: 10000
           });
@@ -729,7 +754,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         {/* Modal de Progresso do Upload */}
         {isUploading && uploadProgress.total > 0 && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-gradient-to-br from-purple-900 to-purple-800 p-8 rounded-xl shadow-2xl border border-purple-600/50 max-w-md w-full mx-4">
+            <div className="bg-gradient-to-br from-purple-900 to-purple-800 p-8 rounded-xl shadow-2xl border border-purple-600/50 max-w-lg w-full mx-4">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 relative">
                   <div className="absolute inset-0 border-4 border-purple-600/30 rounded-full"></div>
@@ -747,27 +772,51 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </div>
                 
                 <h3 className="text-xl font-semibold text-white mb-2">
-                  Processando arquivo...
+                  Processando arquivo CSV...
                 </h3>
                 
-                <p className="text-purple-200 mb-4">
+                <p className="text-purple-200 mb-4 text-sm leading-relaxed">
                   {uploadProgress.message}
                 </p>
                 
-                <div className="w-full bg-purple-900/50 rounded-full h-3 mb-4">
+                <div className="w-full bg-purple-900/50 rounded-full h-4 mb-4">
                   <div 
-                    className="bg-gradient-to-r from-purple-500 to-purple-400 h-3 rounded-full transition-all duration-300 ease-out"
+                    className="bg-gradient-to-r from-purple-500 to-purple-400 h-4 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
                   ></div>
                 </div>
                 
-                <div className="flex justify-between text-sm text-purple-300">
-                  <span>Pedaço {uploadProgress.current} de {uploadProgress.total}</span>
+                <div className="flex justify-between text-sm text-purple-300 mb-4">
+                  <span>Chunk {uploadProgress.current} de {uploadProgress.total}</span>
                   <span>{Math.round((uploadProgress.current / uploadProgress.total) * 100)}%</span>
                 </div>
                 
+                {/* Estatísticas em tempo real */}
+                <div className="bg-purple-800/30 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div className="text-center">
+                      <div className="text-purple-300">Tamanho dos chunks</div>
+                      <div className="text-white font-semibold">512KB</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-purple-300">Timeout por chunk</div>
+                      <div className="text-white font-semibold">5 min</div>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="mt-4 text-xs text-purple-400">
-                  ⚡ Upload otimizado em pedaços para máxima estabilidade
+                  ⚡ Upload otimizado • Processamento em tempo real • Feedback detalhado
+                </div>
+                
+                {/* Indicador de atividade */}
+                <div className="flex items-center justify-center mt-3">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                  </div>
+                  <span className="ml-2 text-xs text-purple-300">Processando...</span>
                 </div>
               </div>
             </div>

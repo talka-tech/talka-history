@@ -48,11 +48,13 @@ export default async function handler(request: Request): Promise<Response> {
 
     // Processamento rápido do CSV
     let processedMessages = 0;
+    let totalLines = 0;
     
     if (chunk && chunk.trim()) {
       console.log('🔄 Processing CSV lines...');
       
       const lines = chunk.split('\n').filter(line => line.trim());
+      totalLines = lines.length;
       console.log(`📊 Found ${lines.length} lines to process`);
       
       // Se é o primeiro chunk, detecta headers
@@ -70,7 +72,13 @@ export default async function handler(request: Request): Promise<Response> {
 
       // Processa linhas em batch para velocidade
       const messages: any[] = [];
+      
+      // Log de progresso a cada 100 linhas
       for (let i = startIndex; i < lines.length; i++) {
+        if (i % 100 === 0 && i > 0) {
+          console.log(`🔄 Processing line ${i}/${lines.length} (${Math.round((i/lines.length)*100)}%)`);
+        }
+        
         const line = lines[i];
         if (!line.trim()) continue;
 
@@ -99,7 +107,7 @@ export default async function handler(request: Request): Promise<Response> {
       }
 
       processedMessages = messages.length;
-      console.log(`✅ Processed ${processedMessages} messages from chunk`);
+      console.log(`✅ Processed ${processedMessages} messages from ${totalLines} lines`);
 
       // Salva no Supabase em batch
       if (messages.length > 0) {
@@ -126,13 +134,17 @@ export default async function handler(request: Request): Promise<Response> {
       }
     }
 
-    // Resposta otimizada
+    // Resposta otimizada com mais detalhes
     const result: any = {
       success: true,
       chunkIndex: chunkIndex + 1,
       totalChunks,
       processedMessages,
-      isLastChunk
+      totalLines,
+      linesProcessed: totalLines,
+      messagesFound: processedMessages,
+      isLastChunk,
+      timestamp: new Date().toISOString()
     };
 
     if (isLastChunk) {
