@@ -12,6 +12,10 @@
   },
   "routes": [
     {
+      "src": "/api/upload-simple",
+      "dest": "/api/upload-simple.ts"
+    },
+    {
       "src": "/api/upload-csv",
       "dest": "/api/upload-csv.ts"
     },

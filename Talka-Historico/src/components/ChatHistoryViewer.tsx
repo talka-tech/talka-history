@@ -315,32 +315,20 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       console.log('🌐 Sending request to /api/upload-csv...');
       const requestStart = Date.now();
       
-      // **DECISÃO: Sempre usar chunks para máxima estabilidade**
-      const isLargeFile = file.size > 256 * 1024; // 256KB - força chunks para qualquer arquivo significativo
+      // **DECISÃO: Upload direto - simples e eficiente**
+      console.log('📦 Usando upload direto otimizado...');
       
-      if (isLargeFile) {
-        console.log('📦 Usando upload em chunks otimizado para máxima estabilidade...');
-        
-        toast({
-          title: "🚀 Processando arquivo...",
-          description: `Usando upload otimizado em pedaços para garantir estabilidade...`,
-          duration: 5000
-        });
-        
-        // Usar API de chunks
-        const success = await uploadFileInChunks(text, currentUserId);
-        
-        if (success) {
-          // Atualiza a lista de conversas
-          fetchConversations();
-          return; // Sai da função se sucesso
-        } else {
-          throw new Error('Falha no upload por chunks');
-        }
-      }
+      toast({
+        title: "🚀 Processando arquivo...",
+        description: `Enviando ${(file.size / 1024 / 1024).toFixed(2)}MB para processamento...`,
+        duration: 5000
+      });
       
-      // Upload normal para arquivos pequenos (<1MB)
-      const response = await fetch('/api/upload-csv', {
+      // Simula progresso para feedback visual
+      setUploadProgress({ current: 1, total: 1, message: 'Enviando arquivo para o servidor...' });
+      
+      // Upload direto para a nova API
+      const response = await fetch('/api/upload-simple', {
         method: 'POST',
         headers: { 
           'Content-Type': 'text/plain',
@@ -354,8 +342,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       console.log('📡 Request completed:', {
         status: response.status,
         statusText: response.statusText,
-        responseTime: `${requestTime}ms`,
-        headers: Object.fromEntries(response.headers.entries())
+        responseTime: `${requestTime}ms`
       });
 
       clearTimeout(timeoutId);
@@ -372,7 +359,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         
         try {
           errorData = await response.json();
-          console.error('� Error response data:', errorData);
+          console.error('🔥 Error response data:', errorData);
         } catch (parseError) {
           console.error('❌ Failed to parse error response:', parseError);
           const responseText = await response.text();
@@ -381,30 +368,19 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         
         if (response.status === 413) {
           errorMessage = `❌ ARQUIVO MUITO GRANDE (${(file.size / 1024 / 1024).toFixed(2)}MB)\n\n` +
-                        `O Vercel limita uploads em 3-4MB. Soluções:\n` +
-                        `• Divida o CSV em arquivos menores\n` +
-                        `• Remova colunas desnecessárias\n` +
-                        `• Use compressão antes do upload`;
+                        `O servidor não conseguiu processar um arquivo deste tamanho.\n` +
+                        `Tente dividir o CSV em arquivos menores.`;
         } else if (response.status === 500) {
           errorMessage = `❌ ERRO INTERNO DO SERVIDOR (500)\n\n` +
-                        `Detalhes: ${errorData.details || errorData.message || 'Erro desconhecido'}\n\n` +
-                        `Possíveis causas:\n` +
-                        `• Problema na configuração do Supabase\n` +
-                        `• Formato CSV incompatível\n` +
-                        `• Timeout no processamento\n\n` +
-                        `Erro técnico: ${errorData.supabaseError || errorData.error || 'N/A'}`;
+                        `Detalhes: ${errorData.details || errorData.error || 'Erro desconhecido'}\n\n` +
+                        `Tente novamente em alguns minutos.`;
         } else if (response.status === 400) {
           errorMessage = `❌ PROBLEMA NO ARQUIVO CSV\n\n` +
                         `${errorData.error || 'Formato inválido'}\n\n` +
-                        `Verifique se:\n` +
-                        `• O arquivo tem as colunas corretas\n` +
-                        `• Não está corrompido\n` +
-                        `• Está em formato CSV válido`;
+                        `Verifique se o arquivo está no formato correto.`;
         } else {
           errorMessage = `❌ ERRO DESCONHECIDO (${response.status})\n\n` +
-                        `${errorData.error || errorData.message || response.statusText}\n\n` +
-                        `Status: ${response.status}\n` +
-                        `Detalhes: ${JSON.stringify(errorData, null, 2)}`;
+                        `${errorData.error || errorData.message || response.statusText}`;
         }
         
         throw new Error(errorMessage);
@@ -420,12 +396,21 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         throw new Error('Resposta do servidor inválida');
       }
       
+      // Atualiza progresso final
+      setUploadProgress({ 
+        current: 1, 
+        total: 1, 
+        message: `✅ Concluído! ${result.totalMessages} mensagens de ${result.conversations} conversas processadas` 
+      });
+      
       // Atualiza a lista de conversas
       fetchConversations();
       
       toast({
-        title: "Upload Concluído!",
-        description: `${result.processed || 0} conversas processadas com ${result.totalMessages || 0} mensagens salvas.`,
+        title: "🎉 Upload Concluído!",
+        description: `${result.conversations} conversas processadas com ${result.totalMessages} mensagens salvas!`,
+        variant: "default",
+        duration: 10000
       });
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -752,21 +737,21 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         </div>
         
         {/* Modal de Progresso do Upload */}
-        {isUploading && uploadProgress.total > 0 && (
+        {isUploading && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-gradient-to-br from-purple-900 to-purple-800 p-8 rounded-xl shadow-2xl border border-purple-600/50 max-w-lg w-full mx-4">
+            <div className="bg-gradient-to-br from-purple-900 to-purple-800 p-8 rounded-xl shadow-2xl border border-purple-600/50 max-w-md w-full mx-4">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 relative">
                   <div className="absolute inset-0 border-4 border-purple-600/30 rounded-full"></div>
                   <div 
                     className="absolute inset-0 border-4 border-transparent border-t-purple-400 rounded-full animate-spin"
                     style={{
-                      animationDuration: '1s'
+                      animationDuration: '1.5s'
                     }}
                   ></div>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-purple-300 font-bold text-sm">
-                      {Math.round((uploadProgress.current / uploadProgress.total) * 100)}%
+                      {uploadProgress.total > 0 ? Math.round((uploadProgress.current / uploadProgress.total) * 100) : 0}%
                     </span>
                   </div>
                 </div>
@@ -776,47 +761,46 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </h3>
                 
                 <p className="text-purple-200 mb-4 text-sm leading-relaxed">
-                  {uploadProgress.message}
+                  {uploadProgress.message || 'Enviando arquivo para o servidor...'}
                 </p>
                 
-                <div className="w-full bg-purple-900/50 rounded-full h-4 mb-4">
-                  <div 
-                    className="bg-gradient-to-r from-purple-500 to-purple-400 h-4 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
-                  ></div>
-                </div>
+                {uploadProgress.total > 0 && (
+                  <div className="w-full bg-purple-900/50 rounded-full h-3 mb-4">
+                    <div 
+                      className="bg-gradient-to-r from-purple-500 to-purple-400 h-3 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    ></div>
+                  </div>
+                )}
                 
-                <div className="flex justify-between text-sm text-purple-300 mb-4">
-                  <span>Chunk {uploadProgress.current} de {uploadProgress.total}</span>
-                  <span>{Math.round((uploadProgress.current / uploadProgress.total) * 100)}%</span>
-                </div>
-                
-                {/* Estatísticas em tempo real */}
+                {/* Estatísticas simplificadas */}
                 <div className="bg-purple-800/30 rounded-lg p-4 mb-4">
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="text-xs text-purple-300 mb-2">Sistema Otimizado</div>
+                  <div className="flex justify-center items-center space-x-4 text-xs">
                     <div className="text-center">
-                      <div className="text-purple-300">Tamanho dos chunks</div>
-                      <div className="text-white font-semibold">512KB</div>
+                      <div className="text-white font-semibold">Upload Direto</div>
+                      <div className="text-purple-400">Sem chunks</div>
                     </div>
+                    <div className="w-1 h-6 bg-purple-600/50"></div>
                     <div className="text-center">
-                      <div className="text-purple-300">Timeout por chunk</div>
-                      <div className="text-white font-semibold">5 min</div>
+                      <div className="text-white font-semibold">Processamento</div>
+                      <div className="text-purple-400">Em lote</div>
                     </div>
                   </div>
                 </div>
                 
                 <div className="mt-4 text-xs text-purple-400">
-                  ⚡ Upload otimizado • Processamento em tempo real • Feedback detalhado
+                  ⚡ Arquitetura simplificada • Processamento otimizado
                 </div>
                 
                 {/* Indicador de atividade */}
                 <div className="flex items-center justify-center mt-3">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
                   </div>
-                  <span className="ml-2 text-xs text-purple-300">Processando...</span>
+                  <span className="ml-2 text-xs text-purple-300">Aguarde...</span>
                 </div>
               </div>
             </div>
