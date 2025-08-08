@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, MessageSquare, Github, Mail, Eye, EyeOff } from 'lucide-react';
+import { Loader2, MessageSquare, Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormProps {
   onLogin: (userData: any) => void;
@@ -22,6 +22,13 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     setIsLoading(true);
     setError('');
 
+    // Validação no frontend
+    if (!username.trim() || !password.trim()) {
+      setError('Nome de usuário e senha são obrigatórios');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/login', {
         method: 'POST',
@@ -37,11 +44,12 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       const data = await response.json();
 
       if (response.ok) {
-        onLogin(data.user);
+        onLogin(data);
       } else {
-        setError(data.message || 'Erro ao fazer login');
+        setError(data.error || data.message || 'Erro ao fazer login');
       }
     } catch (err) {
+      console.error('Erro de login:', err);
       setError('Erro de conexão. Tente novamente.');
     } finally {
       setIsLoading(false);
@@ -68,8 +76,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           <div className="text-center space-y-8">
             {/* Talka Logo */}
             <div className="flex items-center justify-center space-x-4 mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                <MessageSquare className="w-8 h-8 text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 p-2">
+                <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
               </div>
               <div className="text-left">
                 <h1 className="text-5xl font-bold">Talka</h1>
@@ -110,59 +118,27 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       </div>
 
       {/* Right Side - Login Form inspirado na RocketSeat */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900">
         <div className="w-full max-w-md space-y-8">
           {/* Header */}
           <div className="text-center space-y-2">
             <div className="lg:hidden flex items-center justify-center space-x-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
-                <MessageSquare className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center p-2">
+                <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
               </div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
                 Talka
               </h1>
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Acesse sua conta</h2>
-            <p className="text-gray-600">Entre com suas credenciais para continuar</p>
-          </div>
-
-          {/* Social Login Buttons - Estilo RocketSeat */}
-          <div className="space-y-3">
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full h-12 text-gray-700 border-gray-300 hover:bg-gray-50"
-              disabled
-            >
-              <Github className="w-5 h-5 mr-3" />
-              Entrar com GitHub
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full h-12 text-gray-700 border-gray-300 hover:bg-gray-50"
-              disabled
-            >
-              <Mail className="w-5 h-5 mr-3" />
-              Entrar com Google
-            </Button>
-          </div>
-
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-50 text-gray-500">ou continue com</span>
-            </div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Acesse sua conta</h2>
+            <p className="text-gray-600 dark:text-gray-400">Entre com suas credenciais para continuar</p>
           </div>
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="username" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Nome de usuário
                 </Label>
                 <Input
@@ -171,19 +147,19 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="h-12 text-base border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                  className="h-12 text-base border-gray-300 dark:border-gray-600 focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:text-white"
                   placeholder="Digite seu usuário"
                 />
               </div>
               
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Senha
                   </Label>
                   <button
                     type="button"
-                    className="text-sm text-purple-600 hover:text-purple-500"
+                    className="text-sm text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
                     disabled
                   >
                     Esqueceu a senha?
@@ -196,13 +172,13 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="h-12 text-base pr-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    className="h-12 text-base pr-12 border-gray-300 dark:border-gray-600 focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:text-white"
                     placeholder="Digite sua senha"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   >
                     {showPassword ? (
                       <EyeOff className="w-5 h-5" />
@@ -215,8 +191,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             </div>
 
             {error && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertDescription className="text-red-800 text-sm">
+              <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/50">
+                <AlertDescription className="text-red-800 dark:text-red-200 text-sm">
                   {error}
                 </AlertDescription>
               </Alert>
@@ -240,7 +216,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
           {/* Footer */}
           <div className="text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Plataforma segura e confiável para análise de conversas
             </p>
           </div>

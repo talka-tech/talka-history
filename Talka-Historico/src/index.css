@@ -93,6 +93,31 @@ Roxo/Violeta principal com gradientes azuis/ciano para comunicação moderna
     --primary: 270 85% 65%;
     --primary-foreground: 270 15% 8%;
 
+    /* Talka cores escuras */
+    --talka-purple: 270 85% 65%;
+    --talka-blue: 220 85% 65%;
+    --talka-cyan: 190 85% 65%;
+    --talka-gradient-start: 270 85% 65%;
+    --talka-gradient-end: 190 85% 65%;
+
+    /* Chat-specific colors dark mode */
+    --chat-primary: 270 85% 65%;
+    --chat-secondary: 220 85% 65%;
+    --chat-bubble-sent: 270 85% 65%;
+    --chat-bubble-received: 270 15% 15%;
+    --chat-sidebar: 270 15% 10%;
+    --chat-header: 270 85% 65%;
+
+    /* Gradientes escuros */
+    --gradient-talka: linear-gradient(135deg, hsl(270 85% 65%), hsl(220 85% 65%), hsl(190 85% 65%));
+    --gradient-talka-subtle: linear-gradient(135deg, hsl(270 85% 65% / 0.1), hsl(190 85% 65% / 0.05));
+    --gradient-background: linear-gradient(135deg, hsl(270 15% 8%), hsl(270 15% 6%));
+    --gradient-header: linear-gradient(135deg, hsl(270 85% 65%), hsl(220 85% 65%));
+
+    /* Shadows escuras */
+    --shadow-talka: 0 10px 30px -10px hsl(270 85% 65% / 0.3);
+    --shadow-glow-talka: 0 0 30px hsl(270 85% 65% / 0.4);
+
     --secondary: 270 15% 15%;
     --secondary-foreground: 270 5% 95%;
 
@@ -224,42 +249,17 @@ Roxo/Violeta principal com gradientes azuis/ciano para comunicação moderna
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(270 85% 50%);
   }
-}
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 270 20% 15%;
-    --sidebar-accent-foreground: 270 5% 95%;
-    --sidebar-border: 270 20% 20%;
-    --sidebar-ring: 270 85% 65%;
+  /* Dark mode scrollbar */
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(270 15% 15%);
   }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(270 85% 65%);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(270 85% 75%);
+  }
+}

@@ -59,9 +59,12 @@ export default async function handler(request: Request) {
 
     // Login bem-sucedido
     return new Response(JSON.stringify({
-      id: user.id,
-      username: user.username,
-      isAdmin: user.user_type === 'admin' || user.username === 'admin',
+      user: {
+        id: user.id,
+        username: user.username,
+        user_type: user.user_type,
+        isAdmin: user.user_type === 'admin' || user.username === 'admin',
+      }
     }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     });

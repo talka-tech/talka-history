@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "@/hooks/use-theme";
 import ChatHistoryViewer from '@/components/ChatHistoryViewer';
 import LoginForm from '@/components/LoginForm';
 import AdminPanel from '@/components/AdminPanel';
@@ -37,30 +38,17 @@ function App() {
     }
   }, []);
 
-  const handleLogin = async (username: string, password: string) => {
+  const handleLogin = async (userData: any) => {
     try {
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Credenciais inválidas');
-        }
-
-        const userData = await response.json();
-        
         setIsAuthenticated(true);
-        setIsAdmin(userData.isAdmin);
-        setCurrentUser(userData.username);
-        setCurrentUserId(userData.id);
+        setIsAdmin(userData.user.isAdmin);
+        setCurrentUser(userData.user.username);
+        setCurrentUserId(userData.user.id);
 
         localStorage.setItem('talkahistory_auth', JSON.stringify({
-            username: userData.username,
-            userId: userData.id,
-            isAdmin: userData.isAdmin,
+            username: userData.user.username,
+            userId: userData.user.id,
+            isAdmin: userData.user.isAdmin,
             timestamp: Date.now()
         }));
 
@@ -85,12 +73,13 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Router>
-          <div className="App">
-            <Routes>
+      <ThemeProvider defaultTheme="system" storageKey="talka-ui-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Router>
+            <div className="App">
+              <Routes>
               {/* Rota de login */}
               <Route 
                 path="/login" 
@@ -147,6 +136,7 @@ function App() {
           </div>
         </Router>
       </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

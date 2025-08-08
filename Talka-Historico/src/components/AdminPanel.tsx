@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Shield, Activity, UserCheck, Clock, Edit, Key, BarChart3, User } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 // Interface expandida para incluir mais campos
 interface User {
@@ -254,13 +255,13 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50/50 via-blue-50/30 to-cyan-50/50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50/50 via-blue-50/30 to-cyan-50/50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Talka Header */}
-        <div className="flex justify-between items-center mb-8 p-6 rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 text-white shadow-lg shadow-purple-500/20">
+        <div className="flex justify-between items-center mb-8 p-6 rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 text-white shadow-lg shadow-purple-500/20 dark:shadow-purple-500/30">
           <div>
             <h1 className="text-4xl font-bold flex items-center gap-3">
-              <Shield className="w-10 h-10 text-white" />
+              <img src="/img/logo.png" alt="Talka Logo" className="w-10 h-10 object-contain" />
               Talka Admin
             </h1>
             <p className="text-white/80 mt-2">Gestão completa de usuários da plataforma Talka</p>
@@ -277,6 +278,7 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                 </div>
               </div>
             )}
+            <ThemeToggle />
             <Button
               onClick={onLogout}
               variant="ghost"
@@ -289,7 +291,7 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-white/70 backdrop-blur-sm shadow-sm border border-purple-100">
+          <TabsList className="grid w-full grid-cols-3 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm shadow-sm border border-purple-100 dark:border-purple-900">
             <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
               <Users className="w-4 h-4" />
               Gerenciar Usuários
@@ -307,11 +309,11 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards com cores Talka */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-white to-purple-50/30 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-white to-purple-50/30 dark:from-gray-800 dark:to-purple-900/20 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Total de Usuários</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Usuários</p>
                       <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{isFetching ? '...' : stats.total}</p>
                     </div>
                     <Users className="w-8 h-8 text-purple-600" />
@@ -319,11 +321,11 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                 </CardContent>
               </Card>
               
-              <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-white to-green-50/30 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-white to-green-50/30 dark:from-gray-800 dark:to-green-900/20 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Usuários Ativos</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Usuários Ativos</p>
                       <p className="text-3xl font-bold text-green-600">{isFetching ? '...' : stats.active}</p>
                     </div>
                     <UserCheck className="w-8 h-8 text-green-600" />
@@ -331,11 +333,11 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                 </CardContent>
               </Card>
               
-              <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-white to-blue-50/30 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-white to-blue-50/30 dark:from-gray-800 dark:to-blue-900/20 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Administradores</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Administradores</p>
                       <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{isFetching ? '...' : stats.admins}</p>
                     </div>
                     <Shield className="w-8 h-8 text-blue-600" />
@@ -343,11 +345,11 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                 </CardContent>
               </Card>
               
-              <Card className="border-l-4 border-l-cyan-500 bg-gradient-to-br from-white to-cyan-50/30 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-l-4 border-l-cyan-500 bg-gradient-to-br from-white to-cyan-50/30 dark:from-gray-800 dark:to-cyan-900/20 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Novos (7 dias)</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Novos (7 dias)</p>
                       <p className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-purple-600 bg-clip-text text-transparent">{isFetching ? '...' : stats.lastWeek}</p>
                     </div>
                     <Clock className="w-8 h-8 text-cyan-600" />
@@ -357,9 +359,9 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
             </div>
 
             {/* Quick Actions com visual melhorado */}
-            <Card className="bg-gradient-to-br from-white to-gray-50/30 border border-gray-200 shadow-lg">
+            <Card className="bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-800 dark:to-gray-700/30 border border-gray-200 dark:border-gray-700 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-800">
+                <CardTitle className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
                   <Settings className="w-5 h-5 text-purple-600" />
                   Ações Rápidas
                 </CardTitle>
@@ -376,14 +378,14 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                   <Button 
                     variant="outline" 
                     onClick={fetchUsers}
-                    className="flex items-center gap-2 h-16 border-purple-200 hover:bg-purple-50 hover:border-purple-300 transition-all duration-200"
+                    className="flex items-center gap-2 h-16 border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-200"
                   >
                     <Activity className="w-5 h-5 text-purple-600" />
                     Atualizar Dados
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="flex items-center gap-2 h-16 border-cyan-200 hover:bg-cyan-50 hover:border-cyan-300 transition-all duration-200"
+                    className="flex items-center gap-2 h-16 border-cyan-200 dark:border-cyan-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:border-cyan-300 dark:hover:border-cyan-700 transition-all duration-200"
                   >
                     <Shield className="w-5 h-5 text-cyan-600" />
                     Logs do Sistema
