@@ -5,11 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, Plus, Trash2, LogOut, Eye, EyeOff } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Shield, Activity, UserCheck, Clock, Edit, Key } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-// A interface agora inclui a senha e tipo de usuário
+// Interface expandida para incluir mais campos
 interface User {
   id: number;
   username: string;
@@ -19,6 +23,15 @@ interface User {
   user_type?: string;
 }
 
+interface UserStats {
+  total: number;
+  active: number;
+  inactive: number;
+  admins: number;
+  clients: number;
+  lastWeek: number;
+}
+
 interface AdminPanelProps {
   onLogout: () => void;
 }
@@ -26,10 +39,21 @@ interface AdminPanelProps {
 const AdminPanel = ({ onLogout }: AdminPanelProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', password: '' });
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ username: '', password: '', userType: 'client' });
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set());
+  const [stats, setStats] = useState<UserStats>({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    admins: 0,
+    clients: 0,
+    lastWeek: 0
+  });
 
   // Função para buscar usuários da API
   const fetchUsers = useCallback(async () => {
@@ -41,6 +65,21 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
       }
       const data = await response.json();
       setUsers(data);
+      
+      // Calcular estatísticas
+      const now = new Date();
+      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      const newStats: UserStats = {
+        total: data.length,
+        active: data.filter((u: User) => u.status === 'active').length,
+        inactive: data.filter((u: User) => u.status === 'inactive').length,
+        admins: data.filter((u: User) => u.user_type === 'admin' || u.username === 'admin').length,
+        clients: data.filter((u: User) => u.user_type === 'client').length,
+        lastWeek: data.filter((u: User) => new Date(u.created_at) >= lastWeek).length
+      };
+      
+      setStats(newStats);
     } catch (error) {
       toast({
         title: "Erro",
@@ -76,7 +115,11 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
       const response = await fetch('/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser)
+        body: JSON.stringify({
+          username: newUser.username,
+          password: newUser.password,
+          userType: newUser.userType
+        })
       });
 
       if (!response.ok) {
@@ -89,13 +132,67 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
         description: "Usuário criado com sucesso!",
       });
       
-      setNewUser({ username: '', password: '' });
+      setNewUser({ username: '', password: '', userType: 'client' });
       setIsCreateDialogOpen(false);
-      fetchUsers(); // Atualiza a lista de usuários
+      fetchUsers();
       
     } catch (error) {
       toast({
         title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setNewPassword('');
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!editingUser || !newPassword) {
+      toast({
+        title: "Erro",
+        description: "Por favor, digite uma nova senha.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/update-user-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: editingUser.id,
+          newPassword: newPassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao atualizar senha.');
+      }
+      
+      toast({
+        title: "Sucesso",
+        description: "Senha atualizada com sucesso!",
+      });
+      
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+      setNewPassword('');
+      fetchUsers();
+      
+    } catch (error) {
+      toast({
+        title: "Erro", 
         description: error.message,
         variant: "destructive"
       });
@@ -156,191 +253,393 @@ const AdminPanel = ({ onLogout }: AdminPanelProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Painel Administrativo</h1>
-            <p className="text-gray-600 mt-1">Gerencie usuários do TalkaHistory</p>
+            <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
+              <Shield className="w-10 h-10 text-blue-600" />
+              Painel Administrativo
+            </h1>
+            <p className="text-gray-600 mt-2">Gestão completa de usuários do TalkaHistory</p>
           </div>
           <Button
             onClick={onLogout}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 hover:bg-red-50 hover:border-red-200"
           >
             <LogOut className="w-4 h-4" />
             Sair
           </Button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total de Usuários</p>
-                  <p className="text-3xl font-bold text-gray-900">{isFetching ? '...' : users.length}</p>
-                </div>
-                <Users className="w-8 h-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Usuários Ativos</p>
-                  <p className="text-3xl font-bold text-green-600">
-                    {isFetching ? '...' : users.filter(user => user.status === 'active').length}
-                  </p>
-                </div>
-                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                  Ativo
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Último Usuário</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {isFetching ? '...' : (users.length > 0 ? users[users.length - 1].username : 'Nenhum')}
-                  </p>
-                </div>
-                <Plus className="w-8 h-8 text-gray-400" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Gerenciar Usuários
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Configurações
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Users Table */}
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Usuários do Sistema</CardTitle>
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2">
+          <TabsContent value="overview" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total de Usuários</p>
+                      <p className="text-3xl font-bold text-gray-900">{isFetching ? '...' : stats.total}</p>
+                    </div>
+                    <Users className="w-8 h-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-l-4 border-l-green-500">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Usuários Ativos</p>
+                      <p className="text-3xl font-bold text-green-600">{isFetching ? '...' : stats.active}</p>
+                    </div>
+                    <UserCheck className="w-8 h-8 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-l-4 border-l-purple-500">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Administradores</p>
+                      <p className="text-3xl font-bold text-purple-600">{isFetching ? '...' : stats.admins}</p>
+                    </div>
+                    <Shield className="w-8 h-8 text-purple-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-l-4 border-l-orange-500">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Novos (7 dias)</p>
+                      <p className="text-3xl font-bold text-orange-600">{isFetching ? '...' : stats.lastWeek}</p>
+                    </div>
+                    <Clock className="w-8 h-8 text-orange-600" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Ações Rápidas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button 
+                    onClick={() => setIsCreateDialogOpen(true)}
+                    className="flex items-center gap-2 h-16"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Criar Novo Usuário
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={fetchUsers}
+                    className="flex items-center gap-2 h-16"
+                  >
+                    <Activity className="w-5 h-5" />
+                    Atualizar Dados
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2 h-16"
+                  >
+                    <Shield className="w-5 h-5" />
+                    Logs do Sistema
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-6">
+            {/* Users Table */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Usuários do Sistema
+                  </CardTitle>
+                  <Button 
+                    onClick={() => setIsCreateDialogOpen(true)}
+                    className="flex items-center gap-2"
+                  >
                     <Plus className="w-4 h-4" />
                     Novo Usuário
                   </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Criar Novo Usuário</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateUser} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="new-username">Nome de Usuário</Label>
-                      <Input
-                        id="new-username"
-                        type="text"
-                        placeholder="Digite o nome de usuário"
-                        value={newUser.username}
-                        onChange={(e) => setNewUser(prev => ({ ...prev, username: e.target.value }))}
-                        disabled={isLoading}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password">Senha</Label>
-                      <Input
-                        id="new-password"
-                        type="password"
-                        placeholder="Digite a senha"
-                        value={newUser.password}
-                        onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                        disabled={isLoading}
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreateDialogOpen(false)}
-                        disabled={isLoading}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button type="submit" disabled={isLoading}>
-                        {isLoading ? "Criando..." : "Criar Usuário"}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Senha</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Criado em</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isFetching ? (
-                    <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
-                ) : (
-                    users.map((user) => (
-                    <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.username}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm">
-                              {visiblePasswords.has(user.id) ? user.password : '••••••••'}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => togglePasswordVisibility(user.id)}
-                              className="h-6 w-6 p-0"
-                            >
-                              {visiblePasswords.has(user.id) ? 
-                                <EyeOff className="w-3 h-3" /> : 
-                                <Eye className="w-3 h-3" />
-                              }
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                        <Badge 
-                            variant={user.status === 'active' ? 'default' : 'secondary'}
-                            className={user.status === 'active' ? 'bg-green-100 text-green-800' : ''}
-                        >
-                            {user.status === 'active' ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                        </TableCell>
-                        <TableCell>{formatDate(user.created_at)}</TableCell>
-                        <TableCell>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            disabled={user.username === 'admin'} // Proteger usuário admin
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </Button>
-                        </TableCell>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Senha</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Criado em</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
-                    ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {isFetching ? (
+                      <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
+                    ) : (
+                      users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.username}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.user_type === 'admin' || user.username === 'admin' ? 'default' : 'secondary'}>
+                              {user.user_type === 'admin' || user.username === 'admin' ? 'Admin' : 'Cliente'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm">
+                                {visiblePasswords.has(user.id) ? user.password : '••••••••'}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => togglePasswordVisibility(user.id)}
+                                className="h-6 w-6 p-0"
+                              >
+                                {visiblePasswords.has(user.id) ? 
+                                  <EyeOff className="w-3 h-3" /> : 
+                                  <Eye className="w-3 h-3" />
+                                }
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={user.status === 'active' ? 'default' : 'secondary'}
+                              className={user.status === 'active' ? 'bg-green-100 text-green-800' : ''}
+                            >
+                              {user.status === 'active' ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(user.created_at)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditUser(user)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    disabled={user.username === 'admin'}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem certeza que deseja excluir o usuário "{user.username}"? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={() => handleDeleteUser(user.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Configurações do Sistema
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Configurações Gerais</h3>
+                    <p className="text-gray-600">Configure as preferências globais do sistema.</p>
+                  </div>
+                  <Separator />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Política de Senhas</Label>
+                      <p className="text-sm text-gray-600">Atualmente: Mínimo 6 caracteres</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Sessão</Label>
+                      <p className="text-sm text-gray-600">Timeout: 24 horas</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Create User Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Criar Novo Usuário</DialogTitle>
+              <DialogDescription>
+                Preencha os dados para criar um novo usuário no sistema.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-username">Nome de Usuário</Label>
+                <Input
+                  id="new-username"
+                  type="text"
+                  placeholder="Digite o nome de usuário"
+                  value={newUser.username}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, username: e.target.value }))}
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Senha</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Digite a senha"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="user-type">Tipo de Usuário</Label>
+                <Select 
+                  value={newUser.userType} 
+                  onValueChange={(value) => setNewUser(prev => ({ ...prev, userType: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="client">Cliente</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                  disabled={isLoading}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Criando..." : "Criar Usuário"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Key className="w-5 h-5" />
+                Alterar Senha - {editingUser?.username}
+              </DialogTitle>
+              <DialogDescription>
+                Digite a nova senha para o usuário {editingUser?.username}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nova Senha</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Digite a nova senha"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                  disabled={isLoading}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleUpdatePassword} 
+                  disabled={isLoading || !newPassword}
+                >
+                  {isLoading ? "Atualizando..." : "Atualizar Senha"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

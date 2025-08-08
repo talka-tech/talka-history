@@ -36,7 +36,7 @@ export default async function handler(request: Request) {
     }
 
     if (!users || users.length === 0) {
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+      return new Response(JSON.stringify({ error: 'Usuário não encontrado' }), {
         status: 401, headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -45,14 +45,14 @@ export default async function handler(request: Request) {
 
     // Verificar se o usuário está ativo
     if (user.status !== 'active') {
-      return new Response(JSON.stringify({ error: 'User account is inactive' }), {
+      return new Response(JSON.stringify({ error: 'Conta de usuário inativa' }), {
         status: 401, headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // Verificar a senha (comparação simples)
     if (user.password !== password) {
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+      return new Response(JSON.stringify({ error: 'Senha incorreta' }), {
         status: 401, headers: { 'Content-Type': 'application/json' },
       });
     }

@@ -6,6 +6,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export const config = {
   runtime: 'edge',
+  maxDuration: 60, // 60 segundos para arquivos grandes
 };
 
 interface Message {
