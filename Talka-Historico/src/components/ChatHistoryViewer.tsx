@@ -4,7 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, Search, MessageCircle, Users, Calendar, FileText, LogOut, Settings, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Upload, Search, MessageCircle, Users, Calendar, FileText, LogOut, Settings, Trash2, MoreVertical } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 // Interfaces permanecem as mesmas
@@ -46,7 +52,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [conversationsPerPage] = useState(10);
-  const [visibleConversations, setVisibleConversations] = useState(10); // Para carregamento lazy
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Função para extrair nome da empresa do username
@@ -140,6 +145,73 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       setIsDeletingData(false);
     }
   }, [currentUserId, toast, fetchConversations]);
+
+  // Função para excluir uma mensagem específica
+  const handleDeleteMessage = useCallback(async (messageId: string, conversationId: string) => {
+    try {
+      console.log('🗑️ Excluindo mensagem:', { messageId, conversationId });
+      
+      const response = await fetch('/api/delete-message', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messageId,
+          conversationId,
+          userId: currentUserId
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao excluir mensagem');
+      }
+
+      // Atualiza a conversa local removendo a mensagem
+      if (selectedConversation && selectedConversation.id === conversationId) {
+        const updatedMessages = selectedConversation.messages.filter(msg => msg.id !== messageId);
+        const updatedConversation = {
+          ...selectedConversation,
+          messages: updatedMessages,
+          messageCount: updatedMessages.length,
+          lastMessage: updatedMessages.length > 0 ? updatedMessages[updatedMessages.length - 1].content.substring(0, 50) : 'Nenhuma mensagem',
+          lastTimestamp: updatedMessages.length > 0 ? updatedMessages[updatedMessages.length - 1].timestamp : selectedConversation.lastTimestamp
+        };
+        setSelectedConversation(updatedConversation);
+      }
+
+      // Atualiza a lista de conversas
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === conversationId) {
+          const updatedMessages = conv.messages.filter(msg => msg.id !== messageId);
+          return {
+            ...conv,
+            messages: updatedMessages,
+            messageCount: updatedMessages.length,
+            lastMessage: updatedMessages.length > 0 ? updatedMessages[updatedMessages.length - 1].content.substring(0, 50) : 'Nenhuma mensagem',
+            lastTimestamp: updatedMessages.length > 0 ? updatedMessages[updatedMessages.length - 1].timestamp : conv.lastTimestamp
+          };
+        }
+        return conv;
+      }));
+
+      toast({
+        title: "✅ Mensagem excluída!",
+        description: "A mensagem foi removida com sucesso.",
+        variant: "default",
+        duration: 3000
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao excluir mensagem:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível excluir a mensagem.",
+        variant: "destructive",
+      });
+    }
+  }, [currentUserId, selectedConversation, toast]);
 
   // Busca as conversas quando o componente carrega
   useEffect(() => {
@@ -623,7 +695,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   // Reset página quando filtro muda
   useEffect(() => {
     setCurrentPage(1);
-    setVisibleConversations(10); // Reset carregamento lazy também
   }, [searchTerm]);
 
   const formatTimestamp = useCallback((timestamp: string) => {
@@ -859,29 +930,38 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         <p className="text-sm text-purple-300">Tente pesquisar com outros termos</p>
                     </div>
                     )}
-                    
-                    {/* Botão carregar mais (carregamento lazy) */}
-                    {!isFetching && currentConversations.length > 0 && currentPage < totalPages && (
-                      <div className="p-4 text-center">
-                        <Button
-                          onClick={() => setCurrentPage(prev => prev + 1)}
-                          variant="outline"
-                          size="sm"
-                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20"
-                        >
-                          Carregar próxima página ({currentPage + 1} de {totalPages})
-                        </Button>
-                      </div>
-                    )}
                 </div>
                 
-                {/* Info de paginação simplificada */}
+                {/* Paginação */}
                 {totalPages > 1 && (
                   <div className="p-4 border-t border-purple-600/30">
-                    <div className="text-center">
+                    <div className="flex items-center justify-between">
                       <p className="text-xs text-purple-300">
                         Página {currentPage} de {totalPages} • {filteredConversations.length} conversas
                       </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          variant="outline"
+                          size="sm"
+                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
+                        >
+                          ←
+                        </Button>
+                        <span className="text-xs text-purple-200 px-2">
+                          {currentPage}
+                        </span>
+                        <Button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          variant="outline"
+                          size="sm"
+                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
+                        >
+                          →
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -897,14 +977,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div>
                     <h2 className="font-semibold text-white">{selectedConversation.title}</h2>
                     <p className="text-sm text-purple-200">
-                    {selectedConversation.participants?.length > 0 ? selectedConversation.participants.join(', ') : 'Sem participantes'} • {selectedConversation.messageCount || selectedConversation.messages?.length || 0} mensagens
+                    {selectedConversation.messageCount || selectedConversation.messages?.length || 0} mensagens
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Badge variant="outline" className="border-purple-500/40 text-purple-200">
                     <Calendar className="w-3 h-3 mr-1" />
-                    {selectedConversation.lastTimestamp && selectedConversation.lastTimestamp !== 'Invalid Date' 
-                      ? formatTimestamp(selectedConversation.lastTimestamp) 
+                    {selectedConversation.messages && selectedConversation.messages.length > 0 
+                      ? formatTimestamp(selectedConversation.messages[selectedConversation.messages.length - 1].timestamp) 
                       : 'Data não disponível'}
                     </Badge>
                 </div>
@@ -914,7 +994,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <ScrollArea className="flex-1 bg-purple-900/5">
                 <div className="p-6 space-y-4">
                     {(selectedConversation.messages || []).map((message) => (
-                    <div key={message.id} className="animate-fade-in">
+                    <div key={message.id} className="animate-fade-in group">
                         <div className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] ${message.fromMe ? 'order-2' : 'order-1'}`}>
                             <div className={`flex items-center gap-2 mb-1 ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
@@ -925,7 +1005,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 {message.sender}
                             </span>
                             </div>
-                            <div className={`p-3 rounded-lg shadow-sm ${
+                            <div className={`relative p-3 rounded-lg shadow-sm ${
                             message.fromMe 
                                 ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white ml-4 border border-purple-500/30' 
                                 : 'bg-purple-800/30 border border-purple-600/40 mr-4 text-purple-100 backdrop-blur-sm'
@@ -933,6 +1013,32 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             <div className={message.fromMe ? 'text-white' : 'text-purple-100'}>
                                 {renderMessageContent(message.content)}
                             </div>
+                            
+                            {/* Dropdown menu para excluir mensagem */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`absolute top-2 right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                    message.fromMe 
+                                      ? 'text-white/70 hover:text-white hover:bg-white/10' 
+                                      : 'text-purple-300 hover:text-purple-100 hover:bg-purple-600/20'
+                                  }`}
+                                >
+                                  <MoreVertical className="w-3 h-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-purple-900/90 border-purple-600/50">
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteMessage(message.id, selectedConversation.id)}
+                                  className="text-red-300 hover:text-red-200 hover:bg-red-500/20 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-2" />
+                                  Excluir mensagem
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             </div>
                         </div>
                         </div>
