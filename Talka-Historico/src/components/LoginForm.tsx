@@ -250,3 +250,5 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   );
 }
 
+export default LoginForm;
+
