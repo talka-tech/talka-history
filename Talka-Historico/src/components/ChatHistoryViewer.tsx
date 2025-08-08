@@ -41,6 +41,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [isFetching, setIsFetching] = useState(true);
   const [isLoadingAfterUpload, setIsLoadingAfterUpload] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingData, setIsDeletingData] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,50 +78,53 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   }, [currentUserId]);
 
   // Função para limpar dados
-  const handleClearData = useCallback(async (type: 'conversations' | 'all') => {
-    const confirmMessage = type === 'all' 
-      ? 'Isso apagará TODAS as suas conversas e mensagens. Esta ação não pode ser desfeita!' 
-      : 'Isso apagará todas as suas conversas. Esta ação não pode ser desfeita!';
+  const handleClearData = useCallback(async () => {
+    if (!currentUserId) return;
     
-    if (!confirm(confirmMessage)) return;
-
     try {
-      setIsFetching(true);
+      setIsDeletingData(true);
       
-      const response = await fetch(`/api/clear-data?type=${type}`, {
+      const response = await fetch('/api/clear-data', {
         method: 'DELETE',
         headers: {
-          'x-user-id': currentUserId.toString()
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: currentUserId
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao limpar dados');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao limpar dados');
       }
 
       const result = await response.json();
       
-      toast({
-        title: "✅ Dados removidos!",
-        description: result.message,
-        variant: "default"
-      });
-
-      // Atualiza a lista
+      // Atualiza o estado local
       setConversations([]);
       setSelectedConversation(null);
       setShowSettings(false);
-
+      setShowDeleteModal(false);
+      
+      toast({
+        title: "✅ Dados limpos!",
+        description: result.message,
+        variant: "default",
+        duration: 5000
+      });
+      
     } catch (error) {
+      console.error('Erro ao limpar dados:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível limpar os dados.",
-        variant: "destructive"
+        description: error.message || "Não foi possível limpar os dados. Tente novamente.",
+        variant: "destructive",
       });
     } finally {
-      setIsFetching(false);
+      setIsDeletingData(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, toast]);
 
   // Busca as conversas quando o componente carrega
   useEffect(() => {
@@ -673,22 +678,13 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <h3 className="text-white font-medium mb-3 text-sm">⚙️ Configurações</h3>
                 <div className="space-y-2">
                   <Button
-                    onClick={() => handleClearData('conversations')}
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-orange-300 border-orange-500/40 hover:bg-orange-500/20 hover:text-orange-200"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Limpar Conversas
-                  </Button>
-                  <Button
-                    onClick={() => handleClearData('all')}
+                    onClick={() => setShowDeleteModal(true)}
                     variant="outline"
                     size="sm"
                     className="w-full text-red-300 border-red-500/40 hover:bg-red-500/20 hover:text-red-200"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Apagar Tudo
+                    Apagar Todas as Conversas
                   </Button>
                 </div>
               </div>
@@ -829,6 +825,66 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             </div>
             )}
         </div>
+        
+        {/* Modal de Confirmação para Deletar */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-gradient-to-br from-red-900/90 to-red-800/90 p-8 rounded-xl shadow-2xl border border-red-600/50 max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-8 h-8 text-red-400" />
+                </div>
+                
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  Apagar Todas as Conversas?
+                </h3>
+                
+                <p className="text-red-200 mb-6 text-sm leading-relaxed">
+                  Esta ação irá <strong>remover permanentemente</strong> todas as suas conversas e mensagens. 
+                  Esta operação não pode ser desfeita.
+                </p>
+                
+                <div className="bg-red-800/30 rounded-lg p-4 mb-6">
+                  <div className="flex items-center gap-2 text-red-300">
+                    <span className="text-yellow-400">⚠️</span>
+                    <span className="text-sm font-medium">Atenção:</span>
+                  </div>
+                  <p className="text-xs text-red-200 mt-1">
+                    Você tem {conversations.length} conversa{conversations.length !== 1 ? 's' : ''} que ser{conversations.length !== 1 ? 'ão' : 'á'} removida{conversations.length !== 1 ? 's' : ''} do banco de dados.
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setShowDeleteModal(false)}
+                    variant="outline"
+                    className="flex-1 bg-transparent border-gray-500/40 text-gray-300 hover:bg-gray-500/20 hover:text-white"
+                    disabled={isDeletingData}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleClearData}
+                    disabled={isDeletingData}
+                    className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white border-red-500/30"
+                  >
+                    {isDeletingData ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Apagando...
+                      </div>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Confirmar
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Modal de Progresso do Upload */}
         {isUploading && (

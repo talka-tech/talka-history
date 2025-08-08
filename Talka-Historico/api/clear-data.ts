@@ -4,14 +4,14 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const userId = req.headers['x-user-id'];
-    const clearType = req.query.type as string; // 'conversations' ou 'all'
+    // Pegar userId do body ao invés de header
+    const { userId } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'User ID obrigatório' });
     }
 
-    console.log(`🗑️ Limpando dados - Usuário: ${userId}, Tipo: ${clearType}`);
+    console.log(`🗑️ Limpando conversas - Usuário: ${userId}`);
 
     // Configuração Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,10 +24,29 @@ export default async function handler(req: any, res: any) {
     let deletedConversations = 0;
     let deletedMessages = 0;
 
-    if (clearType === 'conversations' || clearType === 'all') {
-      // Primeiro: buscar conversas do usuário
-      const conversationsResponse = await fetch(`${supabaseUrl}/rest/v1/conversations?user_id=eq.${userId}&select=id`, {
-        method: 'GET',
+    // Primeiro: buscar conversas do usuário
+    const conversationsResponse = await fetch(`${supabaseUrl}/rest/v1/conversations?user_id=eq.${userId}&select=id`, {
+      method: 'GET',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!conversationsResponse.ok) {
+      throw new Error(`Erro ao buscar conversas: ${conversationsResponse.status}`);
+    }
+
+    const conversations = await conversationsResponse.json();
+    console.log(`📋 Encontradas ${conversations.length} conversas para deletar`);
+
+    if (conversations.length > 0) {
+      const conversationIds = conversations.map((c: any) => c.id);
+
+      // Deletar mensagens primeiro (FK constraint)
+      const messagesDeleteResponse = await fetch(`${supabaseUrl}/rest/v1/messages?conversation_id=in.(${conversationIds.join(',')})`, {
+        method: 'DELETE',
         headers: {
           'apikey': supabaseKey,
           'Authorization': `Bearer ${supabaseKey}`,
@@ -35,43 +54,41 @@ export default async function handler(req: any, res: any) {
         }
       });
 
-      if (conversationsResponse.ok) {
-        const conversations = await conversationsResponse.json();
-        console.log(`📋 Encontradas ${conversations.length} conversas para deletar`);
-
-        if (conversations.length > 0) {
-          const conversationIds = conversations.map((c: any) => c.id);
-
-          // Deletar mensagens primeiro (FK constraint)
-          const messagesDeleteResponse = await fetch(`${supabaseUrl}/rest/v1/messages?conversation_id=in.(${conversationIds.join(',')})`, {
-            method: 'DELETE',
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (messagesDeleteResponse.ok) {
-            console.log('✅ Mensagens deletadas com sucesso');
-            deletedMessages = conversationIds.length; // Aproximação
+      if (messagesDeleteResponse.ok) {
+        console.log('✅ Mensagens deletadas com sucesso');
+        
+        // Contar mensagens deletadas
+        const messagesCountResponse = await fetch(`${supabaseUrl}/rest/v1/messages?conversation_id=in.(${conversationIds.join(',')})&select=count`, {
+          method: 'HEAD',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Prefer': 'count=exact'
           }
+        });
+        
+        const countHeader = messagesCountResponse.headers.get('content-range');
+        deletedMessages = countHeader ? parseInt(countHeader.split('/')[1] || '0') : 0;
+      } else {
+        console.error('❌ Erro ao deletar mensagens:', messagesDeleteResponse.status);
+      }
 
-          // Depois deletar conversas
-          const conversationsDeleteResponse = await fetch(`${supabaseUrl}/rest/v1/conversations?user_id=eq.${userId}`, {
-            method: 'DELETE',
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (conversationsDeleteResponse.ok) {
-            console.log('✅ Conversas deletadas com sucesso');
-            deletedConversations = conversations.length;
-          }
+      // Depois deletar conversas
+      const conversationsDeleteResponse = await fetch(`${supabaseUrl}/rest/v1/conversations?user_id=eq.${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
         }
+      });
+
+      if (conversationsDeleteResponse.ok) {
+        console.log('✅ Conversas deletadas com sucesso');
+        deletedConversations = conversations.length;
+      } else {
+        console.error('❌ Erro ao deletar conversas:', conversationsDeleteResponse.status);
+        throw new Error(`Erro ao deletar conversas: ${conversationsDeleteResponse.status}`);
       }
     }
 
@@ -81,7 +98,7 @@ export default async function handler(req: any, res: any) {
       success: true,
       deletedConversations,
       deletedMessages,
-      message: `${deletedConversations} conversas removidas com sucesso`
+      message: `${deletedConversations} conversas e ${deletedMessages} mensagens removidas com sucesso!`
     });
 
   } catch (error) {
