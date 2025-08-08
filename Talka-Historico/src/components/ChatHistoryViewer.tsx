@@ -146,7 +146,51 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     }
   }, [currentUserId, toast, fetchConversations]);
 
-  // Função para excluir uma mensagem específica
+  // Função para excluir uma conversa específica
+  const handleDeleteConversation = useCallback(async (conversationId: string) => {
+    try {
+      console.log('🗑️ Excluindo conversa:', conversationId);
+      
+      const response = await fetch('/api/delete-conversation', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversationId,
+          userId: currentUserId
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao excluir conversa');
+      }
+
+      // Remove a conversa da lista local
+      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      
+      // Se a conversa excluída estava selecionada, desseleciona
+      if (selectedConversation && selectedConversation.id === conversationId) {
+        setSelectedConversation(null);
+      }
+
+      toast({
+        title: "✅ Conversa excluída!",
+        description: "A conversa foi removida com sucesso.",
+        variant: "default",
+        duration: 3000
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao excluir conversa:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível excluir a conversa.",
+        variant: "destructive",
+      });
+    }
+  }, [currentUserId, selectedConversation, toast]);
   const handleDeleteMessage = useCallback(async (messageId: string, conversationId: string) => {
     try {
       console.log('🗑️ Excluindo mensagem:', { messageId, conversationId });
@@ -880,20 +924,46 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     ) : currentConversations.map((conversation) => (
                     <Card
                         key={conversation.id}
-                        className={`p-4 mb-2 cursor-pointer transition-all hover:shadow-md border-purple-600/30 bg-purple-800/20 hover:bg-purple-700/30 ${
+                        className={`p-4 mb-2 cursor-pointer transition-all hover:shadow-md border-purple-600/30 bg-purple-800/20 hover:bg-purple-700/30 relative group ${
                         selectedConversation?.id === conversation.id 
                             ? 'ring-2 ring-purple-400 bg-purple-700/40 border-purple-400/50' 
                             : ''
                         }`}
                         onClick={() => setSelectedConversation(conversation)}
                     >
+                        {/* Menu de 3 pontinhos */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="absolute top-2 right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-purple-300 hover:text-purple-100 hover:bg-purple-600/20"
+                              onClick={(e) => e.stopPropagation()} // Evita selecionar a conversa
+                            >
+                              <MoreVertical className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-purple-900/90 border-purple-600/50">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteConversation(conversation.id);
+                              }}
+                              className="text-red-300 hover:text-red-200 hover:bg-red-500/20 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3 mr-2" />
+                              Excluir conversa
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
                         <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-sm truncate flex-1 text-white">
+                        <h3 className="font-medium text-sm truncate flex-1 text-white pr-8">
                             {conversation.title || 'Conversa sem título'}
                         </h3>
-                        <span className="text-xs text-purple-300 ml-2">
+                        <span className="text-xs text-purple-300 ml-2 flex-shrink-0">
                             {conversation.lastTimestamp && conversation.lastTimestamp !== 'Invalid Date' 
-                              ? formatTimestamp(conversation.lastTimestamp).split(' ')[0] 
+                              ? new Date(conversation.lastTimestamp).toLocaleDateString('pt-BR') 
                               : ''}
                         </span>
                         </div>
@@ -902,10 +972,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         </p>
                         <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs bg-purple-700/40 text-purple-100 border-purple-600/40">
-                            <Users className="w-3 h-3 mr-1" />
-                            {conversation.participants?.length || 0}
-                            </Badge>
                             <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-200">
                             <MessageCircle className="w-3 h-3 mr-1" />
                             {conversation.messageCount || conversation.messages?.length || 0}
