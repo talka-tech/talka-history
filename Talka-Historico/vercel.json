@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "functions": {
+    "api/upload-csv.ts": {
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/upload-csv",
+      "dest": "/api/upload-csv.ts"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1.ts"
+    }
+  ]
+}

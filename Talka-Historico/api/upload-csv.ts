@@ -33,216 +33,255 @@ interface Conversation {
   messages: Message[];
 }
 
-export default async function handler(request: Request) {
-  const startTime = Date.now();
-  console.log('🚀 Upload CSV API called:', {
+export default async function handler(request: Request): Promise<Response> {
+  // Log inicial detalhado
+  console.log('🚀 Upload CSV API chamado:', {
     method: request.method,
     url: request.url,
     timestamp: new Date().toISOString()
   });
 
-  // Headers CORS para permitir requisições
-  const headers = {
-    'Content-Type': 'application/json',
+  // Headers de CORS
+  const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-user-id',
   };
 
   if (request.method === 'OPTIONS') {
-    console.log('✅ OPTIONS preflight handled');
-    return new Response(null, { status: 200, headers });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   if (request.method !== 'POST') {
-    console.error('❌ Invalid method:', request.method);
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405, 
-      headers,
+    return new Response(JSON.stringify({ error: 'Método não permitido' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-
-  // Log request headers
-  const requestHeaders = {};
-  request.headers.forEach((value, key) => {
-    requestHeaders[key] = value;
-  });
-  console.log('📋 Request headers:', requestHeaders);
-
-  const userId = request.headers.get('x-user-id');
-  if (!userId) {
-    console.error('❌ Missing user ID in headers');
-    return new Response(JSON.stringify({ error: 'User ID is required' }), {
-      status: 401, 
-      headers,
-    });
-  }
-
-  console.log(`👤 Processing for user ${userId}`);
 
   try {
-    console.log(`📥 Starting CSV processing for user ${userId}`);
+    // Verificar user-id
+    const userId = request.headers.get('x-user-id');
+    console.log('👤 User ID recebido:', userId);
     
-    // Ler o conteúdo do arquivo com melhor tratamento de erro
-    console.log('📖 Reading request body...');
-    let csvText = '';
-    try {
-      csvText = await request.text();
-      console.log('✅ Request body read successfully:', {
-        contentLength: csvText.length,
-        sizeKB: (csvText.length / 1024).toFixed(2),
-        firstLine: csvText.split('\n')[0]?.substring(0, 100) + '...'
-      });
-    } catch (error) {
-      console.error('❌ Error reading request body:', error);
-      return new Response(JSON.stringify({ error: 'Failed to read file content. File might be too large or corrupted.' }), {
-        status: 400, 
-        headers,
-      });
-    }
-    
-    if (!csvText || csvText.trim().length === 0) {
-      console.error('❌ Empty CSV file received');
-      return new Response(JSON.stringify({ error: 'Empty CSV file' }), {
-        status: 400, 
-        headers,
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'User ID é obrigatório' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Verificar tamanho do conteúdo
-    const contentSizeMB = csvText.length / (1024 * 1024);
-    console.log(`📊 CSV size: ${contentSizeMB.toFixed(2)} MB`);
+    // Ler o conteúdo do request
+    console.log('📖 Lendo conteúdo do arquivo...');
+    const csvContent = await request.text();
+    console.log('📏 Tamanho do conteúdo:', csvContent.length, 'caracteres');
     
-    if (contentSizeMB > 50) {
-      console.error(`❌ CSV too large: ${contentSizeMB.toFixed(2)} MB`);
+    if (!csvContent || csvContent.length === 0) {
+      return new Response(JSON.stringify({ error: 'Arquivo CSV vazio' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Verificar tamanho (Vercel limit é 4.5MB para payloads)
+    const sizeMB = csvContent.length / (1024 * 1024);
+    console.log('📊 Tamanho do arquivo:', sizeMB.toFixed(2), 'MB');
+    
+    if (sizeMB > 4.5) {
+      console.log('❌ Arquivo muito grande para Vercel:', sizeMB.toFixed(2), 'MB');
       return new Response(JSON.stringify({ 
-        error: `Arquivo muito grande: ${contentSizeMB.toFixed(2)} MB. Máximo permitido: 50 MB.` 
+        error: 'Arquivo muito grande. Máximo permitido: 4.5MB',
+        size: sizeMB.toFixed(2) + 'MB' 
       }), {
-        status: 413, 
-        headers,
+        status: 413,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`📈 Processing CSV with ${csvText.length} characters for user ${userId}`);
+    // Parse do CSV line por line para economizar memória
+    console.log('� Iniciando análise do CSV...');
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    console.log('📄 Total de linhas:', lines.length);
     
-    // Para arquivos grandes, processar de forma mais otimizada
-    let conversations;
-    try {
-      conversations = parseCSVToConversations(csvText);
-    } catch (parseError) {
-      console.error('❌ Error parsing CSV:', parseError);
+    if (lines.length === 0) {
+      return new Response(JSON.stringify({ error: 'Arquivo CSV sem conteúdo válido' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const headers = lines[0].toLowerCase();
+    console.log('📋 Headers detectados:', headers);
+    
+    // Validação de headers obrigatórios
+    const requiredFields = ['chat_id', 'text', 'type'];
+    const missingFields = requiredFields.filter(field => !headers.includes(field));
+    
+    if (missingFields.length > 0) {
       return new Response(JSON.stringify({ 
-        error: 'Erro ao processar CSV: ' + parseError.message 
+        error: `Campos obrigatórios ausentes: ${missingFields.join(', ')}`,
+        received: headers 
       }), {
-        status: 400, 
-        headers,
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // Conectar ao Supabase
+    console.log('🔗 Conectando ao Supabase...');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_ANON_KEY;
     
-    if (conversations.length === 0) {
-      console.error('❌ No valid conversations found');
-      return new Response(JSON.stringify({ error: 'No valid conversations found in CSV' }), {
-        status: 400, 
-        headers,
+    if (!supabaseUrl || !supabaseKey) {
+      console.log('❌ Variáveis do Supabase não configuradas');
+      return new Response(JSON.stringify({ error: 'Configuração do banco de dados não encontrada' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`Found ${conversations.length} conversations to process`);
+    console.log('✅ Supabase configurado, iniciando processamento...');
+    
+    // Processar dados em lotes menores para evitar timeout
+    const dataLines = lines.slice(1); // Remove header
+    const batchSize = 50; // Lotes menores para Vercel
+    let processedMessages = 0;
+    let conversationStats: { [key: string]: number } = {};
 
-    // Para CSVs grandes, processar uma conversa por vez com feedback
-    let totalProcessed = 0;
-    let totalMessages = 0;
+    console.log(`🔄 Processando ${dataLines.length} mensagens em lotes de ${batchSize}...`);
 
-    for (const convo of conversations) {
-      try {
-        console.log(`Processing conversation: ${convo.title} with ${convo.messages.length} messages`);
+    // Processar em batches
+    for (let i = 0; i < dataLines.length; i += batchSize) {
+      const batch = dataLines.slice(i, i + batchSize);
+      console.log(`📦 Processando lote ${Math.floor(i / batchSize) + 1}/${Math.ceil(dataLines.length / batchSize)}`);
+      
+      const batchData: any[] = [];
+      
+      for (const line of batch) {
+        if (!line.trim()) continue;
         
-        // Inserir/atualizar conversa
-        const { error: convoError } = await supabase
-          .from('conversations')
-          .upsert({
-            id: convo.id,
-            title: convo.title,
-            participants: convo.participants,
-            message_count: convo.messageCount,
-            last_message: convo.lastMessage,
-            last_timestamp: convo.lastTimestamp,
-            owner_user_id: parseInt(userId)
-          }, {
-            onConflict: 'id'
+        try {
+          // Parse simples de CSV (pode melhorar com biblioteca se necessário)
+          const columns = line.split(',').map(col => col.replace(/"/g, '').trim());
+          
+          if (columns.length < 3) continue;
+          
+          const chatId = columns[0];
+          const text = columns[7] || columns[1] || ''; // text pode estar em posições diferentes
+          const type = columns[5] || columns[2] || 'text';
+          
+          if (!chatId || !text) continue;
+          
+          // Estatísticas
+          if (!conversationStats[chatId]) {
+            conversationStats[chatId] = 0;
+          }
+          conversationStats[chatId]++;
+          
+          batchData.push({
+            user_id: parseInt(userId),
+            chat_id: chatId,
+            message_text: text.substring(0, 2000), // Limit text size
+            message_type: type,
+            created_at: new Date().toISOString(),
+            metadata: {
+              original_line: i + batchData.length + 1,
+              batch: Math.floor(i / batchSize) + 1
+            }
+          });
+          
+        } catch (error) {
+          console.log('⚠️ Erro ao processar linha:', error.message);
+        }
+      }
+      
+      // Salvar lote no Supabase
+      if (batchData.length > 0) {
+        try {
+          const response = await fetch(`${supabaseUrl}/rest/v1/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`,
+              'apikey': supabaseKey,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(batchData)
           });
 
-        if (convoError) {
-          console.error('Error inserting conversation:', convoError);
-          continue;
-        }
-
-        // Deletar mensagens existentes da conversa
-        const { error: deleteError } = await supabase
-          .from('messages')
-          .delete()
-          .eq('conversation_id', convo.id);
-
-        if (deleteError) {
-          console.error('Error deleting old messages:', deleteError);
-        }
-
-        // Inserir mensagens em batches muito pequenos para evitar timeout
-        const messageBatchSize = 20; // Apenas 20 mensagens por vez
-        for (let j = 0; j < convo.messages.length; j += messageBatchSize) {
-          const messageBatch = convo.messages.slice(j, j + messageBatchSize);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.log('❌ Erro ao salvar lote no Supabase:', response.status, errorText);
+            throw new Error(`Erro no Supabase: ${response.status}`);
+          }
           
-          const messagesToInsert = messageBatch.map(msg => ({
-            conversation_id: convo.id,
-            timestamp: msg.timestamp,
-            sender: msg.sender,
-            content: msg.content,
-            from_me: msg.fromMe
-          }));
-
-          const { error: msgError } = await supabase
-            .from('messages')
-            .insert(messagesToInsert);
-
-          if (msgError) {
-            console.error('Error inserting messages batch:', msgError);
-          } else {
-            totalMessages += messageBatch.length;
-          }
-
-          // Pequena pausa para não sobrecarregar
-          if (j > 0 && j % 100 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 10));
-          }
+          processedMessages += batchData.length;
+          console.log(`✅ Lote salvo: ${batchData.length} mensagens. Total: ${processedMessages}`);
+          
+        } catch (error) {
+          console.log('❌ Erro ao salvar no Supabase:', error.message);
         }
-
-        totalProcessed++;
-        console.log(`✓ Processed conversation ${totalProcessed}/${conversations.length}: ${convo.title} (${convo.messages.length} messages)`);
-        
-      } catch (convError) {
-        console.error(`Error processing conversation ${convo.id}:`, convError);
-        continue;
       }
     }
-    
-    return new Response(JSON.stringify({ 
-      message: `Upload concluído com sucesso!`,
-      total: conversations.length,
-      processed: totalProcessed,
-      totalMessages: totalMessages
+
+    // Salvar estatísticas das conversas
+    console.log('💾 Salvando estatísticas das conversas...');
+    const conversationData = Object.entries(conversationStats).map(([chatId, messageCount]) => ({
+      user_id: parseInt(userId),
+      chat_id: chatId,
+      message_count: messageCount,
+      last_message_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    }));
+
+    if (conversationData.length > 0) {
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/conversations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+            'apikey': supabaseKey,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(conversationData)
+        });
+
+        if (!response.ok) {
+          console.log('⚠️ Erro ao salvar conversas:', response.status);
+        } else {
+          console.log(`✅ ${conversationData.length} conversas salvas`);
+        }
+      } catch (error) {
+        console.log('⚠️ Erro ao salvar conversas:', error.message);
+      }
+    }
+
+    console.log('🎉 Upload concluído com sucesso!');
+    console.log(`📊 Resumo: ${processedMessages} mensagens, ${Object.keys(conversationStats).length} conversas`);
+
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'CSV processado com sucesso',
+      stats: {
+        totalLines: dataLines.length,
+        processedMessages: processedMessages,
+        conversationsCount: Object.keys(conversationStats).length,
+        fileSize: sizeMB.toFixed(2) + 'MB'
+      }
     }), {
-      status: 200, 
-      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
-    
+
   } catch (error) {
-    console.error('Upload CSV Error:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Failed to process CSV file. Please check the file format.',
-      details: error instanceof Error ? error.message : 'Unknown error'
+    console.error('❌ Erro geral no processamento:', error);
+    return new Response(JSON.stringify({
+      error: 'Erro interno do servidor',
+      details: error.message
     }), {
-      status: 500, 
-      headers: { 'Content-Type': 'application/json' },
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 }
