@@ -12,30 +12,50 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Método não permitido' });
   }
 
-  console.log('🚀 Iniciando upload CSV...');
+  console.log('🚀 Iniciando upload CSV simples...');
 
   try {
     // Pega o user ID do header
     const userId = req.headers['x-user-id'];
     if (!userId) {
+      console.error('❌ User ID ausente');
       return res.status(400).json({ error: 'User ID obrigatório' });
     }
 
     // Pega o conteúdo CSV do body
     const csvContent = req.body;
     if (!csvContent || typeof csvContent !== 'string') {
+      console.error('❌ Conteúdo CSV inválido');
       return res.status(400).json({ error: 'Conteúdo CSV inválido' });
     }
 
     console.log(`📊 Processando CSV - User: ${userId}, Tamanho: ${csvContent.length} chars`);
 
-    // Configuração Supabase
+    // Configuração Supabase - debug das variáveis
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
+    console.log('🔍 Verificando configuração Supabase:', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseKey,
+      urlStart: supabaseUrl ? supabaseUrl.substring(0, 20) + '...' : 'undefined',
+      keyStart: supabaseKey ? supabaseKey.substring(0, 10) + '...' : 'undefined'
+    });
+
     if (!supabaseUrl || !supabaseKey) {
-      console.error('❌ Configuração Supabase ausente');
-      return res.status(500).json({ error: 'Configuração do banco inválida' });
+      console.error('❌ Configuração Supabase ausente:', {
+        SUPABASE_URL: !!supabaseUrl,
+        SUPABASE_ANON_KEY: !!supabaseKey,
+        allEnvVars: Object.keys(process.env).filter(key => key.includes('SUPABASE'))
+      });
+      return res.status(500).json({ 
+        error: 'Configuração do banco inválida',
+        debug: {
+          hasUrl: !!supabaseUrl,
+          hasKey: !!supabaseKey,
+          envKeys: Object.keys(process.env).filter(key => key.includes('SUPABASE'))
+        }
+      });
     }
 
     // Processa o CSV
