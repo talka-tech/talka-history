@@ -82,10 +82,10 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   // **FUNÇÃO PARA UPLOAD EM CHUNKS - SOLUÇÃO PARA ERRO 413**
   const uploadFileInChunks = async (fileContent: string, userId: number): Promise<boolean> => {
     try {
-      const CHUNK_SIZE = 1024 * 1024; // 1MB chunks para evitar erro 413
+      const CHUNK_SIZE = 512 * 1024; // 512KB chunks para processamento mais rápido
       const totalChunks = Math.ceil(fileContent.length / CHUNK_SIZE);
       
-      console.log(`[CHUNK UPLOAD] Iniciando upload de ${totalChunks} chunks de 1MB`);
+      console.log(`[CHUNK UPLOAD] Iniciando upload de ${totalChunks} chunks de 512KB`);
       
       // Inicializa progresso
       setUploadProgress({ current: 0, total: totalChunks, message: 'Preparando upload...' });
@@ -103,7 +103,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         setUploadProgress({ 
           current: i + 1, 
           total: totalChunks, 
-          message: `Enviando pedaço ${i + 1} de ${totalChunks} (${progressPercent}%)` 
+          message: `Processando pedaço ${i + 1} de ${totalChunks} (${progressPercent}%)` 
         });
         
         toast({
@@ -112,19 +112,29 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
           duration: 1500
         });
         
-        const response = await fetch('/api/test-chunk', {
+        // Timeout específico para cada chunk (2 minutos)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          console.error(`⏰ Chunk ${i + 1} timeout após 2 minutos`);
+          controller.abort();
+        }, 120000); // 2 minutos por chunk
+        
+        const response = await fetch('/api/upload-csv-fast', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            chunk: chunk.substring(0, 100) + '...', // Só primeiros 100 chars para teste
+            chunk: chunk, // Chunk completo agora
             chunkIndex: i,
             totalChunks: totalChunks,
             isLastChunk: isLastChunk,
             userId: userId
           }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
           const errorData = await response.text();
@@ -280,11 +290,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       console.log('🌐 Sending request to /api/upload-csv...');
       const requestStart = Date.now();
       
-      // **DECISÃO: Se arquivo > 1MB, usar chunks para evitar 413 e 500**
-      const isLargeFile = file.size > 1 * 1024 * 1024; // 1MB - força chunks sempre
+      // **DECISÃO: Sempre usar chunks para máxima estabilidade**
+      const isLargeFile = file.size > 256 * 1024; // 256KB - força chunks para qualquer arquivo significativo
       
       if (isLargeFile) {
-        console.log('📦 Arquivo detectado, usando upload em chunks para estabilidade...');
+        console.log('📦 Usando upload em chunks otimizado para máxima estabilidade...');
         
         toast({
           title: "🚀 Processando arquivo...",
