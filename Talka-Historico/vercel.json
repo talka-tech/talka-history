@@ -20,6 +20,10 @@
       "dest": "/api/upload-csv-chunk.ts"
     },
     {
+      "src": "/api/test-chunk",
+      "dest": "/api/test-chunk.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1.ts"
     }

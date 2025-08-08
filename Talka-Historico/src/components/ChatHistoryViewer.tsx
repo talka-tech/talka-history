@@ -112,13 +112,13 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
           duration: 1500
         });
         
-        const response = await fetch('/api/upload-csv-chunk', {
+        const response = await fetch('/api/test-chunk', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            chunk: chunk,
+            chunk: chunk.substring(0, 100) + '...', // Só primeiros 100 chars para teste
             chunkIndex: i,
             totalChunks: totalChunks,
             isLastChunk: isLastChunk,
