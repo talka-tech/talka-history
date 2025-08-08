@@ -28,6 +28,10 @@
       "dest": "/api/health.ts"
     },
     {
+      "src": "/api/health-next",
+      "dest": "/api/health-next.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1.ts"
     }
