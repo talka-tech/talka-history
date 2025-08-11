@@ -4,14 +4,26 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Upload, Search, MessageCircle, Users, Calendar, FileText, LogOut, Settings, Trash2, MoreVertical } from 'lucide-react';
+import { AutoCompressUploader } from '@/utils/AutoCompressUploader';
 import { toast } from '@/hooks/use-toast';
+import { 
+  Upload, 
+  Search, 
+  MessageCircle, 
+  FileText, 
+  Calendar, 
+  Settings, 
+  LogOut, 
+  Trash2, 
+  MoreVertical,
+  Users
+} from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 
 // Interfaces permanecem as mesmas
 interface Message {
@@ -53,6 +65,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [currentPage, setCurrentPage] = useState(1);
   const [conversationsPerPage] = useState(10);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Instância do uploader com compressão automática
+  const autoUploader = useRef(new AutoCompressUploader());
 
   // Função para extrair nome da empresa do username
   const getCompanyDisplayName = (username: string) => {
@@ -264,158 +279,25 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     }
   }, [currentUserId, fetchConversations]);
 
-  // **FUNÇÃO PARA UPLOAD ROBUSTO COM CHUNKS PROFISSIONAIS**
-  const uploadFileWithRobustChunks = async (file: File, userId: number): Promise<boolean> => {
-    try {
-      const TARGET_CHUNK_BYTES = 512 * 1024; // ~512KB por chunk (menor carga por requisição)
-      const MAX_RETRIES = 5;
-      const CONCURRENCY = 1; // serial para máxima confiabilidade
-      const TIMEOUT = 180000; // 180s por chunk
-
-      // Lê todo o arquivo e divide por linhas
-      const fileContent = await file.text();
-      const allLines = fileContent.split('\n');
-      if (allLines.length < 2) throw new Error('CSV inválido: falta header ou dados');
-      const header = allLines[0];
-      const dataLines = allLines.slice(1);
-
-      // Monta chunks por linhas, sempre incluindo o header para o backend processar cada parte isoladamente
-      const chunks: string[] = [];
-      let currentLines: string[] = [];
-      let currentSize = header.length + 1; // considera header + \n
-      for (const line of dataLines) {
-        const lineSize = line.length + 1; // + \n
-        if (currentSize + lineSize > TARGET_CHUNK_BYTES && currentLines.length > 0) {
-          // fecha chunk atual
-          chunks.push([header, ...currentLines].join('\n'));
-          currentLines = [];
-          currentSize = header.length + 1;
-        }
-
-        currentLines.push(line);
-        currentSize += lineSize;
-      }
-      // último chunk
-      if (currentLines.length > 0) {
-        chunks.push([header, ...currentLines].join('\n'));
-      }
-
-      const totalChunks = chunks.length;
-      if (totalChunks === 0) return true; // nada para enviar
-
-      console.log(`[ROBUST UPLOAD] Enviando ${totalChunks} chunks (~1MB) por linhas (com header em cada chunk)`);
-
-      let currentProgress = 0;
-      const activeTasks = new Set<Promise<any>>();
-      const uploadedChunks = new Set<number>();
-
-      setUploadProgress({
-        current: 0,
-        total: totalChunks,
-        message: 'Iniciando upload robusto em chunks de linhas...'
-      });
-
-      const uploadChunkWithRetry = async (chunkIndex: number, retries = 0): Promise<void> => {
-        const body = chunks[chunkIndex];
-        const isLast = chunkIndex === totalChunks - 1;
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-          const startTime = Date.now();
-
-          const response = await fetch('/api/upload-csv', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'text/plain',
-              'x-user-id': userId.toString()
-            },
-            body,
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-          const duration = Date.now() - startTime;
-
-          if (!response.ok) {
-            const text = await response.text().catch(() => '');
-            throw new Error(`HTTP ${response.status} ${response.statusText} - ${text.slice(0, 200)}`);
-          }
-
-          // sucesso
-          uploadedChunks.add(chunkIndex);
-          currentProgress++;
-          const percent = Math.round((currentProgress / totalChunks) * 100);
-          setUploadProgress({
-            current: currentProgress,
-            total: totalChunks,
-            message: `✅ Chunk ${chunkIndex + 1}/${totalChunks} enviado (${percent}%) em ${(duration / 1000).toFixed(1)}s`
-          });
-
-          if (currentProgress % 3 === 0 || isLast) {
-            console.log(`[CHUNK ${chunkIndex + 1}] OK em ${(duration / 1000).toFixed(1)}s`);
-          }
-        } catch (err: any) {
-          if (retries < MAX_RETRIES) {
-            const backoff = Math.min(1000 * Math.pow(2, retries), 16000);
-            console.warn(`[CHUNK ${chunkIndex + 1}] retry ${retries + 1}/${MAX_RETRIES} em ${backoff / 1000}s - ${err?.message || err}`);
-            await new Promise(res => setTimeout(res, backoff));
-            return uploadChunkWithRetry(chunkIndex, retries + 1);
-          }
-          throw new Error(`Chunk ${chunkIndex + 1} falhou após ${MAX_RETRIES} tentativas: ${err?.message || err}`);
-        }
-      };
-
-      for (let i = 0; i < totalChunks; i++) {
-        while (activeTasks.size >= CONCURRENCY) {
-          await Promise.race(activeTasks);
-        }
-        const task = uploadChunkWithRetry(i).finally(() => activeTasks.delete(task));
-        activeTasks.add(task);
-      }
-
-      await Promise.all(activeTasks);
-
-      if (uploadedChunks.size !== totalChunks) {
-        throw new Error(`Upload incompleto: ${uploadedChunks.size}/${totalChunks} chunks`);
-      }
-
-      setUploadProgress({
-        current: totalChunks,
-        total: totalChunks,
-        message: `🎉 Upload concluído! ${totalChunks} chunks processados com sucesso`
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('[ROBUST UPLOAD ERROR]:', error);
-      setUploadProgress({ current: 0, total: 0, message: 'Erro no upload robusto' });
-      toast({
-        title: 'Erro no upload',
-        description: error.message || 'Falha no upload',
-        variant: 'destructive',
-      });
-      return false;
-    }
-  };
-
+  // **NOVA FUNÇÃO DE UPLOAD COM COMPRESSÃO AUTOMÁTICA**
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('📁 File selected:', {
+    console.log('📁 Arquivo selecionado:', {
       name: file.name,
       size: file.size,
       type: file.type,
       lastModified: new Date(file.lastModified).toISOString()
     });
 
-    // Verificar se é um arquivo CSV (verificação dupla)
+    // Verificar se é um arquivo CSV
     const isCSV = file.name.toLowerCase().endsWith('.csv') || 
                   file.type === 'text/csv' || 
                   file.type === 'application/csv';
     
     if (!isCSV) {
-      console.error('❌ File validation failed: Not a CSV file');
+      console.error('❌ Validação falhou: não é um arquivo CSV');
       toast({
         title: "Erro no arquivo",
         description: "Por favor, selecione apenas arquivos CSV (.csv).",
@@ -424,30 +306,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return;
     }
 
-    console.log('📊 File size:', {
-      fileSize: file.size,
-      sizeMB: (file.size / 1024 / 1024).toFixed(2)
+    const fileSizeMB = file.size / 1024 / 1024;
+    console.log('📊 Tamanho do arquivo:', {
+      bytes: file.size,
+      MB: fileSizeMB.toFixed(2)
     });
 
     setIsUploading(true);
-    console.log('🚀 Starting upload process...');
-    
+    console.log('🚀 Iniciando processo de upload com compressão automática...');
+
     try {
+      // Validação básica do CSV
       toast({
-        title: "Validando arquivo...",
-        description: "Verificando formato CSV e estrutura dos dados...",
+        title: "🔍 Validando arquivo...",
+        description: "Verificando formato CSV e preparando compressão automática...",
+        duration: 3000
       });
 
-      console.log('📖 Reading file content...');
+      console.log('📖 Validando estrutura do CSV...');
       const text = await file.text();
-      console.log('✅ File read successfully:', {
-        contentLength: text.length,
-        lines: text.split('\n').length,
-        firstLine: text.split('\n')[0]?.substring(0, 100) + '...'
-      });
-
-      // Validar estrutura do CSV
       const lines = text.split('\n').filter(line => line.trim());
+      
       if (lines.length < 2) {
         throw new Error('Arquivo CSV vazio ou com apenas cabeçalho. Certifique-se de que há dados no arquivo.');
       }
@@ -460,189 +339,75 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         throw new Error(`Colunas obrigatórias ausentes no CSV: ${missingColumns.join(', ')}. Verifique se o arquivo tem as colunas corretas.`);
       }
 
-      console.log('✅ CSV validation passed:', {
+      console.log('✅ Validação CSV aprovada:', {
         totalLines: lines.length,
         headers: headers,
         dataLines: lines.length - 1
       });
 
+      // Recreate file object from text (para garantir compatibilidade)
+      const validatedFile = new File([text], file.name, { type: 'text/csv' });
+
+      // Toast inicial para compressão/upload
       toast({
-        title: "Enviando...",
-        description: `Enviando ${(file.size / 1024 / 1024).toFixed(2)}MB para o servidor. Isso pode levar alguns minutos...`,
-      });
-      
-      // Preparar dados de envio
-      const requestData = {
-        url: '/api/upload-csv',
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'text/plain',
-          'x-user-id': currentUserId.toString()
-        },
-        bodySize: text.length
-      };
-      
-      console.log('📤 Preparing request:', requestData);
-      
-      // **DECISÃO: Upload em chunks para arquivos grandes, direto para pequenos**
-      const fileSizeMB = file.size / 1024 / 1024;
-      console.log(`📊 Tamanho do arquivo: ${fileSizeMB.toFixed(2)}MB`);
-      
-      if (fileSizeMB > 2) { // Reduzido drasticamente para 2MB para evitar erro 413
-        console.log('� Arquivo grande detectado! Usando upload super-rápido em paralelo...');
-        toast({
-          title: "🚀 Modo robusto ativado!",
-          description: `Arquivo de ${fileSizeMB.toFixed(2)}MB será processado com chunks de 2MB + retry automático...`,
-          duration: 3000
-        });
-        
-        // Usa upload robusto com chunks profissionais
-        const success = await uploadFileWithRobustChunks(file, currentUserId);
-        if (success) {
-          setIsLoadingAfterUpload(true);
-          fetchConversations();
-          
-          toast({
-            title: "🎉 Upload Robusto Concluído!",
-            description: `Arquivo de ${fileSizeMB.toFixed(2)}MB processado com sistema profissional de chunks!`,
-            variant: "default",
-            duration: 8000
-          });
-        }
-        return; // Sai da função aqui para arquivos > 2MB
-      }
-      
-      // Envia o CSV diretamente para a API com timeout maior (apenas para arquivos < 20MB)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.error('⏰ Request timeout after 5 minutes');
-        controller.abort();
-      }, 300000); // 5 minutos
-      
-      console.log('🌐 Sending request to /api/upload-csv...');
-      const requestStart = Date.now();
-      
-      // **Upload direto para arquivos pequenos**
-      console.log('📦 Usando upload direto para arquivo pequeno...');
-      
-      toast({
-        title: "🚀 Processando arquivo...",
-        description: `Enviando ${(file.size / 1024 / 1024).toFixed(2)}MB para processamento...`,
+        title: "�️ Sistema de Compressão Ativo!",
+        description: fileSizeMB > 1 
+          ? `Arquivo de ${fileSizeMB.toFixed(2)}MB será comprimido automaticamente e enviado...`
+          : `Arquivo de ${fileSizeMB.toFixed(2)}MB sendo processado...`,
         duration: 5000
       });
-      
-      // Simula progresso para feedback visual
-      setUploadProgress({ current: 1, total: 1, message: 'Enviando arquivo para o servidor...' });
-      
-      // Upload direto para a nova API
-      const response = await fetch('/api/upload-csv', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'text/plain',
-          'x-user-id': currentUserId.toString()
-        },
-        body: text,
-        signal: controller.signal
-      });
 
-      const requestTime = Date.now() - requestStart;
-      console.log('📡 Request completed:', {
-        status: response.status,
-        statusText: response.statusText,
-        responseTime: `${requestTime}ms`
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.error('❌ Response not OK:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: response.url
+      // Progress callback para feedback visual
+      const progressCallback = (percent: number, message: string) => {
+        setUploadProgress({
+          current: percent,
+          total: 100,
+          message: message
         });
-        
-        let errorMessage = '';
-        let errorData: any = {};
-        
-        try {
-          errorData = await response.json();
-          console.error('🔥 Error response data:', errorData);
-        } catch (parseError) {
-          console.error('❌ Failed to parse error response:', parseError);
-          const responseText = await response.text();
-          console.error('❌ Raw error response:', responseText.substring(0, 500));
-        }
-        
-        if (response.status === 413) {
-          errorMessage = `❌ ARQUIVO MUITO GRANDE (${(file.size / 1024 / 1024).toFixed(2)}MB)\n\n` +
-                        `O servidor não conseguiu processar um arquivo deste tamanho.\n` +
-                        `Tente dividir o CSV em arquivos menores.`;
-        } else if (response.status === 500) {
-          errorMessage = `❌ ERRO INTERNO DO SERVIDOR (500)\n\n` +
-                        `Detalhes: ${errorData.details || errorData.error || 'Erro desconhecido'}\n\n` +
-                        `Tente novamente em alguns minutos.`;
-        } else if (response.status === 400) {
-          errorMessage = `❌ PROBLEMA NO ARQUIVO CSV\n\n` +
-                        `${errorData.error || 'Formato inválido'}\n\n` +
-                        `Verifique se o arquivo está no formato correto.`;
-        } else {
-          errorMessage = `❌ ERRO DESCONHECIDO (${response.status})\n\n` +
-                        `${errorData.error || errorData.message || response.statusText}`;
-        }
-        
-        throw new Error(errorMessage);
-      }
+      };
 
-      console.log('✅ Response OK, parsing result...');
-      let result;
-      try {
-        result = await response.json();
-        console.log('📊 Upload result:', result);
-      } catch (parseError) {
-        console.error('❌ Failed to parse success response:', parseError);
-        throw new Error('Resposta do servidor inválida');
-      }
-      
-      // Atualiza progresso final
-      setUploadProgress({ 
-        current: 1, 
-        total: 1, 
-        message: `✅ Concluído! ${result.totalMessages} mensagens de ${result.conversations} conversas processadas` 
-      });
-      
-      // Atualiza a lista de conversas
-      setIsLoadingAfterUpload(true); // Ativa loading animado
+      // Upload com compressão automática usando XMLHttpRequest
+      console.log('� Iniciando upload com AutoCompressUploader...');
+      const result = await autoUploader.current.handleFileUpload(
+        validatedFile, 
+        progressCallback, 
+        currentUserId
+      );
+
+      console.log('🎉 Upload concluído com sucesso:', result);
+
+      // Sucesso - atualiza conversas
+      setIsLoadingAfterUpload(true);
       fetchConversations();
-      
+
+      const compressionMessage = fileSizeMB > 1 
+        ? ' Compressão automática aplicada para máxima velocidade!'
+        : '';
+
       toast({
         title: "🎉 Upload Concluído!",
-        description: `${result.conversations} conversas processadas com ${result.totalMessages} mensagens salvas!`,
+        description: `${result.conversations || 'Várias'} conversas processadas com ${result.totalMessages || 'muitas'} mensagens salvas!${compressionMessage}`,
         variant: "default",
         duration: 10000
       });
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        toast({
-          title: "Timeout",
-          description: "O upload levou muito tempo. Tente com um arquivo menor.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Erro ao processar arquivo",
-          description: error.message,
-          variant: "destructive"
-        });
-      }
+
+    } catch (error: any) {
+      console.error('❌ Erro no upload com compressão:', error);
+      toast({
+        title: "Erro no upload",
+        description: error.message || 'Falha no processamento do arquivo',
+        variant: "destructive"
+      });
     } finally {
       setIsUploading(false);
-      setUploadProgress({ current: 0, total: 0, message: '' }); // Limpa progresso
-      // Limpa o input de arquivo para permitir o upload do mesmo arquivo novamente
+      setUploadProgress({ current: 0, total: 0, message: '' });
+      
+      // Limpa o input de arquivo
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     }
-  }, [currentUserId, fetchConversations]); // Adiciona dependências
+  }, [currentUserId, fetchConversations]);
 
   // A função parseCSVToConversations e parseCSVLine continuam as mesmas...
   const parseCSVToConversations = useCallback((csvText: string): Conversation[] => {
@@ -1230,40 +995,45 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </div>
                 
                 <h3 className="text-xl font-semibold text-white mb-2">
-                  Processando arquivo CSV...
+                  � Processamento Frontend Direto...
                 </h3>
                 
                 <p className="text-purple-300/70 mb-4 text-sm leading-relaxed">
-                  {uploadProgress.message || 'Enviando arquivo para o servidor...'}
+                  {uploadProgress.message || 'Processando arquivo localmente...'}
                 </p>
                 
                 {uploadProgress.total > 0 && (
                   <div className="w-full bg-purple-950/60 rounded-full h-3 mb-4">
                     <div 
-                      className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-300 ease-out"
+                      className="bg-gradient-to-r from-green-500 to-purple-600 h-3 rounded-full transition-all duration-300 ease-out"
                       style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
                     ></div>
                   </div>
                 )}
                 
-                {/* Estatísticas simplificadas */}
+                {/* Informações sobre processamento direto */}
                 <div className="bg-black/50 rounded-lg p-4 mb-4 border border-purple-800/30">
-                  <div className="text-xs text-purple-400/70 mb-2">Sistema Otimizado</div>
+                  <div className="text-xs text-purple-400/70 mb-2">Processamento Local + Supabase</div>
                   <div className="flex justify-center items-center space-x-4 text-xs">
                     <div className="text-center">
-                      <div className="text-white font-semibold">Upload Direto</div>
-                      <div className="text-purple-300/70">Sem limites</div>
+                      <div className="text-white font-semibold">Frontend Only</div>
+                      <div className="text-green-300/70">Sem servidor</div>
                     </div>
                     <div className="w-1 h-6 bg-purple-800/60"></div>
                     <div className="text-center">
                       <div className="text-white font-semibold">Processamento</div>
-                      <div className="text-purple-300/70">Em lote</div>
+                      <div className="text-green-300/70">Local</div>
+                    </div>
+                    <div className="w-1 h-6 bg-purple-800/60"></div>
+                    <div className="text-center">
+                      <div className="text-white font-semibold">Supabase</div>
+                      <div className="text-green-300/70">Direto</div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="mt-4 text-xs text-purple-400/60">
-                  ⚡ Sem limites de tamanho • Processamento otimizado
+                <div className="mt-4 text-xs text-green-400/80">
+                  ⚡ Processamento 100% frontend • Conexão direta Supabase • Sem servidor Node.js
                 </div>
                 
                 {/* Indicador de atividade */}
