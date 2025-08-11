@@ -102,7 +102,7 @@ export class AutoCompressUploader {
       
       // Como o id é auto-increment (integer), não enviamos ele
       messagesToInsert.push({
-        conversation_id: data.chat_id,
+        conversation_id: parseInt(data.chat_id), // Converte para int4
         sender: data.fromMe === '1' ? 'Você' : (data.mobile_number || 'Desconhecido'),
         content: data.text,
         timestamp: data.message_created || new Date().toISOString(),
@@ -208,18 +208,39 @@ export class AutoCompressUploader {
 
   async createConversations(conversationIds: string[], userId: number) {
     // Cria conversas vazias primeiro para evitar foreign key constraint
-    for (const convId of conversationIds) {
-      await supabase
+    console.log(`📁 Criando ${conversationIds.length} conversas...`);
+    
+    for (let i = 0; i < conversationIds.length; i++) {
+      const convId = conversationIds[i];
+      
+      // Verifica se a conversa já existe
+      const { data: existing } = await supabase
         .from('conversations')
-        .upsert({
-          id: convId,
-          title: `Conversa ${convId}`,
-          last_message: '',
-          last_timestamp: new Date().toISOString(),
-          message_count: 0,
-          user_id: userId
-        }, { onConflict: 'id' });
+        .select('id')
+        .eq('id', parseInt(convId))
+        .single();
+      
+      if (!existing) {
+        const { error } = await supabase
+          .from('conversations')
+          .insert({
+            id: parseInt(convId),  // Converte para int4
+            title: `Conversa ${convId}`,
+            user_id: userId
+          });
+        
+        if (error) {
+          console.error(`❌ Erro ao criar conversa ${convId}:`, error);
+          throw new Error(`Erro ao criar conversa ${convId}: ${error.message}`);
+        }
+        
+        console.log(`✅ Conversa ${convId} criada (${i + 1}/${conversationIds.length})`);
+      } else {
+        console.log(`⚠️ Conversa ${convId} já existe (${i + 1}/${conversationIds.length})`);
+      }
     }
+    
+    console.log(`🎉 Todas as ${conversationIds.length} conversas foram verificadas/criadas!`);
   }
 
   async updateConversations(conversationIds: string[], userId: number) {
@@ -228,7 +249,7 @@ export class AutoCompressUploader {
       const { data: messages, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('conversation_id', convId)
+        .eq('conversation_id', parseInt(convId))
         .order('timestamp', { ascending: false })
         .limit(1);
 
@@ -240,18 +261,15 @@ export class AutoCompressUploader {
       const { count } = await supabase
         .from('messages')
         .select('id', { count: 'exact' })
-        .eq('conversation_id', convId);
+        .eq('conversation_id', parseInt(convId));
 
-      // Atualiza a conversa com dados reais
+      // Atualiza a conversa com dados reais (apenas título, que é o único campo adicional)
       await supabase
         .from('conversations')
         .update({
-          title: this.generateConversationTitle(lastMessage),
-          last_message: lastMessage.content?.substring(0, 100) || '',
-          last_timestamp: lastMessage.timestamp,
-          message_count: count || 0
+          title: this.generateConversationTitle(lastMessage)
         })
-        .eq('id', convId)
+        .eq('id', parseInt(convId))
         .eq('user_id', userId);
     }
   }
