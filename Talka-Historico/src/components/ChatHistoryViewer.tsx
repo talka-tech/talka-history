@@ -350,10 +350,10 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
       // Toast inicial para compressão/upload
       toast({
-        title: "�️ Sistema de Compressão Ativo!",
+        title: "🗜️ Sistema de Compressão Ativo!",
         description: fileSizeMB > 1 
-          ? `Arquivo de ${fileSizeMB.toFixed(2)}MB será comprimido automaticamente e enviado...`
-          : `Arquivo de ${fileSizeMB.toFixed(2)}MB sendo processado...`,
+          ? `Arquivo de ${fileSizeMB.toFixed(2)}MB será comprimido automaticamente com pako (até 80% redução)...`
+          : `Arquivo de ${fileSizeMB.toFixed(2)}MB sendo processado com compressão automática...`,
         duration: 5000
       });
 
@@ -386,9 +386,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
       toast({
         title: "🎉 Upload Concluído!",
-        description: `${result.conversations || 'Várias'} conversas processadas com ${result.totalMessages || 'muitas'} mensagens salvas!${compressionMessage}`,
+        description: `${result.conversations || 'Várias'} conversas processadas com ${result.totalMessages || 'muitas'} mensagens! Compressão: ${result.compressionRatio || 'N/A'} redução (${result.originalSize} → ${result.compressedSize})`,
         variant: "default",
-        duration: 10000
+        duration: 12000
       });
 
     } catch (error: any) {
@@ -995,11 +995,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </div>
                 
                 <h3 className="text-xl font-semibold text-white mb-2">
-                  � Processamento Frontend Direto...
+                  🗜️ Compressão + Processamento Ativo...
                 </h3>
                 
                 <p className="text-purple-300/70 mb-4 text-sm leading-relaxed">
-                  {uploadProgress.message || 'Processando arquivo localmente...'}
+                  {uploadProgress.message || 'Comprimindo arquivo com pako para máxima eficiência...'}
                 </p>
                 
                 {uploadProgress.total > 0 && (
@@ -1013,27 +1013,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 
                 {/* Informações sobre processamento direto */}
                 <div className="bg-black/50 rounded-lg p-4 mb-4 border border-purple-800/30">
-                  <div className="text-xs text-purple-400/70 mb-2">Processamento Local + Supabase</div>
+                  <div className="text-xs text-purple-400/70 mb-2">Compressão Pako + Supabase Direto</div>
                   <div className="flex justify-center items-center space-x-4 text-xs">
                     <div className="text-center">
-                      <div className="text-white font-semibold">Frontend Only</div>
-                      <div className="text-green-300/70">Sem servidor</div>
+                      <div className="text-white font-semibold">Compressão</div>
+                      <div className="text-green-300/70">Pako (até 80%)</div>
                     </div>
                     <div className="w-1 h-6 bg-purple-800/60"></div>
                     <div className="text-center">
                       <div className="text-white font-semibold">Processamento</div>
-                      <div className="text-green-300/70">Local</div>
+                      <div className="text-green-300/70">Frontend</div>
                     </div>
                     <div className="w-1 h-6 bg-purple-800/60"></div>
                     <div className="text-center">
-                      <div className="text-white font-semibold">Supabase</div>
-                      <div className="text-green-300/70">Direto</div>
+                      <div className="text-white font-semibold">Upload</div>
+                      <div className="text-green-300/70">Supabase</div>
                     </div>
                   </div>
                 </div>
                 
                 <div className="mt-4 text-xs text-green-400/80">
-                  ⚡ Processamento 100% frontend • Conexão direta Supabase • Sem servidor Node.js
+                  ⚡ Compressão real com pako • Processamento frontend • Conexão direta Supabase
                 </div>
                 
                 {/* Indicador de atividade */}
