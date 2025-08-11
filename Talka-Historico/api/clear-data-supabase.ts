@@ -66,35 +66,69 @@ export default async function handler(req: any, res: any) {
         console.log(`📝 Total de mensagens encontradas: ${messageCount}`);
       }
 
-      // Deletar mensagens primeiro (FK constraint)
-      console.log(`🗑️ Deletando ${messageCount || 'todas as'} mensagens...`);
-      const { error: messagesDeleteError } = await supabase
-        .from('messages')
-        .delete()
-        .in('conversation_id', conversationIds);
+      // Deletar mensagens primeiro (FK constraint) - EM LOTES para evitar timeout
+      console.log(`🗑️ Deletando ${messageCount || 'todas as'} mensagens em lotes...`);
+      
+      // Processa em lotes para evitar timeout
+      const DELETE_BATCH_SIZE = 1000;
+      let totalDeletedMessages = 0;
+      
+      for (let i = 0; i < conversationIds.length; i += DELETE_BATCH_SIZE) {
+        const batch = conversationIds.slice(i, i + DELETE_BATCH_SIZE);
+        const batchNumber = Math.floor(i / DELETE_BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(conversationIds.length / DELETE_BATCH_SIZE);
+        
+        console.log(`🗑️ Deletando lote ${batchNumber}/${totalBatches} (${batch.length} conversas)...`);
+        
+        const { error: messagesDeleteError, count } = await supabase
+          .from('messages')
+          .delete({ count: 'exact' })
+          .in('conversation_id', batch);
 
-      if (messagesDeleteError) {
-        console.error('❌ Erro ao deletar mensagens:', messagesDeleteError);
-        throw new Error(`Erro ao deletar mensagens: ${messagesDeleteError.message}`);
-      } else {
-        console.log('✅ Mensagens deletadas com sucesso');
-        deletedMessages = messageCount || 0;
+        if (messagesDeleteError) {
+          console.error(`❌ Erro ao deletar mensagens (lote ${batchNumber}):`, messagesDeleteError);
+          // Continua com próximo lote mesmo se um falhar
+          continue;
+        } else {
+          const deletedInBatch = count || 0;
+          totalDeletedMessages += deletedInBatch;
+          console.log(`✅ Lote ${batchNumber} concluído: ${deletedInBatch} mensagens deletadas`);
+        }
       }
+      
+      console.log(`✅ Total de mensagens deletadas: ${totalDeletedMessages}`);
+      deletedMessages = totalDeletedMessages;
 
-      // Depois deletar conversas
-      console.log(`🗑️ Deletando ${conversations.length} conversas...`);
-      const { error: conversationsDeleteError } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('user_id', userId);
+      // Depois deletar conversas EM LOTES
+      console.log(`🗑️ Deletando ${conversations.length} conversas em lotes...`);
+      
+      let totalDeletedConversations = 0;
+      
+      for (let i = 0; i < conversationIds.length; i += DELETE_BATCH_SIZE) {
+        const batch = conversationIds.slice(i, i + DELETE_BATCH_SIZE);
+        const batchNumber = Math.floor(i / DELETE_BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(conversationIds.length / DELETE_BATCH_SIZE);
+        
+        console.log(`🗑️ Deletando conversas lote ${batchNumber}/${totalBatches} (${batch.length} conversas)...`);
+        
+        const { error: conversationsDeleteError, count } = await supabase
+          .from('conversations')
+          .delete({ count: 'exact' })
+          .in('id', batch);
 
-      if (conversationsDeleteError) {
-        console.error('❌ Erro ao deletar conversas:', conversationsDeleteError);
-        throw new Error(`Erro ao deletar conversas: ${conversationsDeleteError.message}`);
-      } else {
-        console.log('✅ Conversas deletadas com sucesso');
-        deletedConversations = conversations.length;
+        if (conversationsDeleteError) {
+          console.error(`❌ Erro ao deletar conversas (lote ${batchNumber}):`, conversationsDeleteError);
+          // Continua com próximo lote mesmo se um falhar
+          continue;
+        } else {
+          const deletedInBatch = count || 0;
+          totalDeletedConversations += deletedInBatch;
+          console.log(`✅ Lote ${batchNumber} concluído: ${deletedInBatch} conversas deletadas`);
+        }
       }
+      
+      console.log(`✅ Total de conversas deletadas: ${totalDeletedConversations}`);
+      deletedConversations = totalDeletedConversations;
     } else {
       console.log('ℹ️ Nenhuma conversa encontrada para deletar');
     }
