@@ -100,8 +100,8 @@ export class AutoCompressUploader {
 
       conversationIds.add(data.chat_id);
       
+      // Como o id é auto-increment (integer), não enviamos ele
       messagesToInsert.push({
-        id: `${data.chat_id}_${data.message_created}_${Math.random()}`,
         conversation_id: data.chat_id,
         sender: data.fromMe === '1' ? 'Você' : (data.mobile_number || 'Desconhecido'),
         content: data.text,
@@ -147,7 +147,7 @@ export class AutoCompressUploader {
       
       const { error } = await supabase
         .from('messages')
-        .upsert(batch, { onConflict: 'id' });
+        .insert(batch);
 
       if (error) {
         console.error('❌ Erro ao inserir lote:', error);
