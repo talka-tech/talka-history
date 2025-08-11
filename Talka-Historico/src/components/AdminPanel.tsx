@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Shield, Activity, UserCheck, Clock, Edit, Key, BarChart3, User, RefreshCw, FileText, UserX, UserPlus } from 'lucide-react';
+import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Shield, Activity, UserCheck, Clock, Edit, Key, BarChart3, User, RefreshCw, FileText, UserX, UserPlus, TrendingUp, MessagesSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import * as Recharts from 'recharts';
 
 // Interface expandida para incluir mais campos
 interface User {
@@ -37,6 +39,10 @@ interface AdminPanelProps {
   user?: User;
 }
 
+interface MetricsTotals { users: number; conversations: number; messages: number; avgMsgsPerConv: number }
+interface MetricsUserRow { user_id: number; username: string; status: string; user_type?: string; conversations: number; messages: number; lastMessageAt: string | null; last7DaysMessages: number }
+interface MetricsPayload { totals: MetricsTotals; timeseries: { date: string; count: number }[]; perUser: MetricsUserRow[] }
+
 const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -55,6 +61,8 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
     clients: 0,
     lastWeek: 0
   });
+  const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
 
   // Função para buscar usuários da API
   const fetchUsers = useCallback(async () => {
@@ -92,10 +100,25 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
     }
   }, []);
 
+  const fetchMetrics = useCallback(async () => {
+    try {
+      setLoadingMetrics(true);
+      const res = await fetch('/api/admin-metrics');
+      if (!res.ok) throw new Error('Falha ao carregar métricas');
+      const data: MetricsPayload = await res.json();
+      setMetrics(data);
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message || 'Não foi possível carregar métricas', variant: 'destructive' });
+    } finally {
+      setLoadingMetrics(false);
+    }
+  }, []);
+
   // Carregar usuários do banco de dados ao montar o componente
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+    fetchMetrics();
+  }, [fetchUsers, fetchMetrics]);
 
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -287,6 +310,8 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
     });
   };
 
+  const formatShortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6" style={{backgroundColor: '#12032d'}}>
       <div className="max-w-7xl mx-auto">
@@ -295,7 +320,7 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
           <div>
             <h1 className="text-4xl font-bold flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-purple-200/40 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-300/50">
-                <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
+                <img src="/iconpretoebranco.png" alt="Talka Logo" className="w-full h-full object-contain" />
               </div>
               Talka Admin
             </h1>
@@ -340,91 +365,113 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
             </TabsTrigger>
           </TabsList>
 
+          {/* Overview / Dashboards */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Stats Cards com tema roxo escuro */}
+            {/* KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="border-l-4 border-l-purple-400 bg-gradient-to-br from-purple-900/50 to-purple-800/30 shadow-xl hover:shadow-2xl transition-all duration-300 border border-purple-600/30 backdrop-blur-sm">
+              <Card className="border-l-4 border-l-purple-400 bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-purple-200">Total de Usuários</p>
-                      <p className="text-3xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent">{isFetching ? '...' : stats.total}</p>
+                      <p className="text-sm text-purple-300">Total de Usuários</p>
+                      <p className="text-3xl font-bold text-purple-100">{metrics ? metrics.totals.users : '...'}</p>
                     </div>
-                    <Users className="w-8 h-8 text-purple-300" />
+                    <Users className="w-7 h-7 text-purple-300" />
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card className="border-l-4 border-l-green-400 bg-gradient-to-br from-purple-900/50 to-green-900/20 shadow-xl hover:shadow-2xl transition-all duration-300 border border-purple-600/30 backdrop-blur-sm">
+              <Card className="border-l-4 border-l-cyan-400 bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-purple-200">Usuários Ativos</p>
-                      <p className="text-3xl font-bold text-green-400">{isFetching ? '...' : stats.active}</p>
+                      <p className="text-sm text-purple-300">Conversas</p>
+                      <p className="text-3xl font-bold text-cyan-200">{metrics ? metrics.totals.conversations : '...'}</p>
                     </div>
-                    <UserCheck className="w-8 h-8 text-green-400" />
+                    <MessagesSquare className="w-7 h-7 text-cyan-300" />
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card className="border-l-4 border-l-blue-400 bg-gradient-to-br from-purple-900/50 to-blue-900/20 shadow-xl hover:shadow-2xl transition-all duration-300 border border-purple-600/30 backdrop-blur-sm">
+              <Card className="border-l-4 border-l-green-400 bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-purple-200">Administradores</p>
-                      <p className="text-3xl font-bold bg-gradient-to-r from-blue-300 to-blue-100 bg-clip-text text-transparent">{isFetching ? '...' : stats.admins}</p>
+                      <p className="text-sm text-purple-300">Mensagens</p>
+                      <p className="text-3xl font-bold text-green-300">{metrics ? metrics.totals.messages : '...'}</p>
                     </div>
-                    <Shield className="w-8 h-8 text-blue-400" />
+                    <Activity className="w-7 h-7 text-green-300" />
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card className="border-l-4 border-l-cyan-400 bg-gradient-to-br from-purple-900/50 to-cyan-900/20 shadow-xl hover:shadow-2xl transition-all duration-300 border border-purple-600/30 backdrop-blur-sm">
+              <Card className="border-l-4 border-l-amber-400 bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-purple-200">Novos (7 dias)</p>
-                      <p className="text-3xl font-bold bg-gradient-to-r from-cyan-300 to-cyan-100 bg-clip-text text-transparent">{isFetching ? '...' : stats.lastWeek}</p>
+                      <p className="text-sm text-purple-300">Méd. Msg por Conversa</p>
+                      <p className="text-3xl font-bold text-amber-300">{metrics ? metrics.totals.avgMsgsPerConv : '...'}</p>
                     </div>
-                    <Clock className="w-8 h-8 text-cyan-400" />
+                    <TrendingUp className="w-7 h-7 text-amber-300" />
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Quick Actions com visual melhorado */}
-            <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30 shadow-xl backdrop-blur-sm">
+            {/* Timeseries de mensagens (14 dias) */}
+            <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-purple-100">
-                  <Settings className="w-5 h-5 text-purple-300" />
-                  Ações Rápidas
-                </CardTitle>
+                <CardTitle className="text-purple-100">Mensagens por dia (últimos 14 dias)</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button 
-                    onClick={() => setIsCreateDialogOpen(true)}
-                    className="flex items-center gap-2 h-16 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 border border-purple-500/30"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Criar Novo Usuário
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={fetchUsers}
-                    className="flex items-center gap-2 h-16 border-purple-400 bg-purple-800/20 hover:bg-purple-700/30 text-purple-200 hover:text-white hover:border-purple-300 transition-all duration-200"
-                  >
-                    <RefreshCw className="w-5 h-5 text-purple-300" />
-                    Atualizar Dados
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="flex items-center gap-2 h-16 border-purple-400 bg-purple-800/20 hover:bg-purple-700/30 text-purple-200 hover:text-white hover:border-purple-300 transition-all duration-200"
-                  >
-                    <FileText className="w-5 h-5 text-purple-300" />
-                    Logs de Acesso
-                  </Button>
-                </div>
+                <ChartContainer
+                  config={{ messages: { label: 'Mensagens', color: 'hsl(266 72% 60%)' } }}
+                  className="h-72"
+                >
+                  <Recharts.AreaChart data={(metrics?.timeseries || []).map(p => ({ ...p, label: formatShortDate(p.date) }))}>
+                    <Recharts.CartesianGrid strokeDasharray="3 3" />
+                    <Recharts.XAxis dataKey="label" tick={{ fill: '#c4b5fd' }} />
+                    <Recharts.YAxis tick={{ fill: '#c4b5fd' }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Recharts.Area type="monotone" dataKey="count" stroke="var(--color-messages)" fill="var(--color-messages)" fillOpacity={0.25} />
+                  </Recharts.AreaChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Top clientes */}
+            <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30">
+              <CardHeader>
+                <CardTitle className="text-purple-100">Top Clientes por Mensagens</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Conversas</TableHead>
+                      <TableHead>Mensagens</TableHead>
+                      <TableHead>Última atividade</TableHead>
+                      <TableHead>Msg (7d)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingMetrics ? (
+                      <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
+                    ) : (
+                      (metrics?.perUser || []).map((row) => (
+                        <TableRow key={row.user_id}>
+                          <TableCell className="font-medium">{row.username}</TableCell>
+                          <TableCell>
+                            <Badge variant={row.status === 'active' ? 'default' : 'secondary'}>{row.status === 'active' ? 'Ativo' : 'Inativo'}</Badge>
+                          </TableCell>
+                          <TableCell>{row.conversations}</TableCell>
+                          <TableCell>{row.messages.toLocaleString()}</TableCell>
+                          <TableCell>{row.lastMessageAt ? new Date(row.lastMessageAt).toLocaleString('pt-BR') : '-'}</TableCell>
+                          <TableCell>{row.last7DaysMessages}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
