@@ -63,6 +63,19 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
   });
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  
+  // Estados para configurações
+  const [settings, setSettings] = useState({
+    passwordMinLength: 6,
+    sessionTimeout: 24,
+    maxFileSize: 10,
+    autoBackup: true,
+    emailNotifications: true,
+    twoFactorAuth: false,
+    maxLoginAttempts: 5,
+    passwordExpiration: 90
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   // Função para buscar usuários da API
   const fetchUsers = useCallback(async () => {
@@ -312,6 +325,27 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
 
   const formatShortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
+  const handleSettingsUpdate = async (newSettings: any) => {
+    setSettingsLoading(true);
+    try {
+      // Simular salvamento de configurações
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSettings(newSettings);
+      toast({
+        title: "Sucesso",
+        description: "Configurações atualizadas com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao atualizar configurações.",
+        variant: "destructive"
+      });
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6" style={{backgroundColor: '#12032d'}}>
       <div className="max-w-7xl mx-auto">
@@ -420,19 +454,37 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
               <CardHeader>
                 <CardTitle className="text-purple-100">Mensagens por dia (últimos 14 dias)</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{ messages: { label: 'Mensagens', color: 'hsl(266 72% 60%)' } }}
-                  className="h-72"
-                >
-                  <Recharts.AreaChart data={(metrics?.timeseries || []).map(p => ({ ...p, label: formatShortDate(p.date) }))}>
-                    <Recharts.CartesianGrid strokeDasharray="3 3" />
-                    <Recharts.XAxis dataKey="label" tick={{ fill: '#c4b5fd' }} />
-                    <Recharts.YAxis tick={{ fill: '#c4b5fd' }} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Recharts.Area type="monotone" dataKey="count" stroke="var(--color-messages)" fill="var(--color-messages)" fillOpacity={0.25} />
-                  </Recharts.AreaChart>
-                </ChartContainer>
+              <CardContent className="p-2">
+                <div className="w-full h-96">
+                  <ChartContainer
+                    config={{ messages: { label: 'Mensagens', color: 'hsl(266 72% 60%)' } }}
+                    className="w-full h-full"
+                  >
+                    <Recharts.AreaChart 
+                      data={(metrics?.timeseries || []).map(p => ({ ...p, label: formatShortDate(p.date) }))}
+                    >
+                      <Recharts.CartesianGrid strokeDasharray="3 3" stroke="#6b46c1" opacity={0.3} />
+                      <Recharts.XAxis 
+                        dataKey="label" 
+                        tick={{ fill: '#c4b5fd', fontSize: 12 }}
+                        axisLine={{ stroke: '#8b5cf6' }}
+                      />
+                      <Recharts.YAxis 
+                        tick={{ fill: '#c4b5fd', fontSize: 12 }}
+                        axisLine={{ stroke: '#8b5cf6' }}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Recharts.Area 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="var(--color-messages)" 
+                        fill="var(--color-messages)" 
+                        fillOpacity={0.4}
+                        strokeWidth={2}
+                      />
+                    </Recharts.AreaChart>
+                  </ChartContainer>
+                </div>
               </CardContent>
             </Card>
 
@@ -613,30 +665,186 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Configurações de Segurança */}
+              <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30 shadow-xl backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-100">
+                    <Shield className="w-5 h-5" />
+                    Segurança
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-purple-200">Tamanho Mínimo da Senha</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="4"
+                        max="32"
+                        value={settings.passwordMinLength}
+                        onChange={(e) => setSettings(prev => ({ ...prev, passwordMinLength: parseInt(e.target.value) || 6 }))}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-purple-300">caracteres</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-purple-200">Tentativas Máximas de Login</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="3"
+                        max="10"
+                        value={settings.maxLoginAttempts}
+                        onChange={(e) => setSettings(prev => ({ ...prev, maxLoginAttempts: parseInt(e.target.value) || 5 }))}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-purple-300">tentativas</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-purple-200">Expiração de Senha</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="30"
+                        max="365"
+                        value={settings.passwordExpiration}
+                        onChange={(e) => setSettings(prev => ({ ...prev, passwordExpiration: parseInt(e.target.value) || 90 }))}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-purple-300">dias</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label className="text-purple-200">Autenticação de Dois Fatores</Label>
+                    <Button
+                      variant={settings.twoFactorAuth ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSettings(prev => ({ ...prev, twoFactorAuth: !prev.twoFactorAuth }))}
+                    >
+                      {settings.twoFactorAuth ? "Ativado" : "Desativado"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Configurações do Sistema */}
+              <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30 shadow-xl backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-100">
+                    <Settings className="w-5 h-5" />
+                    Sistema
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-purple-200">Timeout de Sessão</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="168"
+                        value={settings.sessionTimeout}
+                        onChange={(e) => setSettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) || 24 }))}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-purple-300">horas</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-purple-200">Tamanho Máximo de Arquivo</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={settings.maxFileSize}
+                        onChange={(e) => setSettings(prev => ({ ...prev, maxFileSize: parseInt(e.target.value) || 10 }))}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-purple-300">MB</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label className="text-purple-200">Backup Automático</Label>
+                    <Button
+                      variant={settings.autoBackup ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSettings(prev => ({ ...prev, autoBackup: !prev.autoBackup }))}
+                    >
+                      {settings.autoBackup ? "Ativado" : "Desativado"}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label className="text-purple-200">Notificações por Email</Label>
+                    <Button
+                      variant={settings.emailNotifications ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSettings(prev => ({ ...prev, emailNotifications: !prev.emailNotifications }))}
+                    >
+                      {settings.emailNotifications ? "Ativado" : "Desativado"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Ações Avançadas */}
             <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30 shadow-xl backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-purple-100">
-                  <Settings className="w-5 h-5" />
-                  Configurações do Sistema
+                  <Activity className="w-5 h-5" />
+                  Ações do Sistema
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-purple-100">Configurações Gerais</h3>
-                    <p className="text-purple-200">Configure as preferências globais do sistema.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-purple-100">Manutenção</h4>
+                    <p className="text-sm text-purple-300">Executar limpeza e otimização</p>
+                    <Button variant="outline" className="w-full" disabled={settingsLoading}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Otimizar Banco
+                    </Button>
                   </div>
-                  <Separator className="bg-purple-600/30" />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-purple-200">Política de Senhas</Label>
-                      <p className="text-sm text-purple-300">Atualmente: Mínimo 6 caracteres</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-purple-200">Sessão</Label>
-                      <p className="text-sm text-purple-300">Timeout: 24 horas</p>
-                    </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-purple-100">Backup</h4>
+                    <p className="text-sm text-purple-300">Gerar backup completo</p>
+                    <Button variant="outline" className="w-full" disabled={settingsLoading}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Criar Backup
+                    </Button>
                   </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-purple-100">Logs</h4>
+                    <p className="text-sm text-purple-300">Visualizar logs do sistema</p>
+                    <Button variant="outline" className="w-full" disabled={settingsLoading}>
+                      <Clock className="w-4 h-4 mr-2" />
+                      Ver Logs
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator className="bg-purple-600/30 my-6" />
+
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={() => handleSettingsUpdate(settings)}
+                    disabled={settingsLoading}
+                    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+                  >
+                    {settingsLoading ? "Salvando..." : "Salvar Configurações"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
