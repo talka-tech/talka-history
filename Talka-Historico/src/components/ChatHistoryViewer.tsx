@@ -78,47 +78,30 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       .join(' ');
   };
 
-  // Estados para paginação
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMoreConversations, setHasMoreConversations] = useState(true);
-  const [currentOffset, setCurrentOffset] = useState(0);
-  const CONVERSATIONS_PER_PAGE = 50;
+  // Estados simplificados (removendo paginação complexa)
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
 
-  // Função para buscar conversas salvas da API (com paginação)
+  // Função para buscar conversas salvas da API (simplificada, sem paginação)
   const fetchConversations = useCallback(async (reset = false) => {
     if (reset) {
       setConversations([]);
-      setCurrentOffset(0);
-      setHasMoreConversations(true);
     }
     
-    const offset = reset ? 0 : currentOffset;
-    setIsFetching(reset); // Só mostra loading inicial no reset
-    setIsLoadingMore(!reset); // Mostra loading "carregando mais" quando não é reset
+    setIsLoadingConversations(true); // Loading específico para visualização
     
     try {
-        console.log(`🚀 Buscando conversas: offset=${offset}, limit=${CONVERSATIONS_PER_PAGE}`);
+        console.log(`🚀 Carregando todas as conversas para visualização...`);
         
-        const response = await fetch(
-          `/api/conversations?userId=${currentUserId}&limit=${CONVERSATIONS_PER_PAGE}&offset=${offset}`
-        );
+        const response = await fetch(`/api/conversations?userId=${currentUserId}&limit=1000`);
         
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
         
-        const newConversations = await response.json();
-        console.log(`✅ Recebidas ${newConversations.length} conversas`);
+        const allConversations = await response.json();
+        console.log(`✅ ${allConversations.length} conversas carregadas para visualização`);
         
-        if (reset) {
-          setConversations(newConversations);
-        } else {
-          setConversations(prev => [...prev, ...newConversations]);
-        }
-        
-        // Atualiza offset e verifica se tem mais
-        setCurrentOffset(offset + CONVERSATIONS_PER_PAGE);
-        setHasMoreConversations(newConversations.length === CONVERSATIONS_PER_PAGE);
+        setConversations(allConversations);
         
     } catch (error) {
         console.error('❌ Erro ao buscar conversas:', error);
@@ -128,18 +111,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             variant: "destructive"
         });
     } finally {
+        setIsLoadingConversations(false);
         setIsFetching(false);
-        setIsLoadingMore(false);
         setIsLoadingAfterUpload(false);
     }
-  }, [currentUserId, currentOffset, toast]);
-
-  // Função para carregar mais conversas
-  const loadMoreConversations = useCallback(() => {
-    if (!isLoadingMore && hasMoreConversations) {
-      fetchConversations(false);
-    }
-  }, [fetchConversations, isLoadingMore, hasMoreConversations]);
+  }, [currentUserId, toast]);
 
   // Função para limpar dados
   const handleClearData = useCallback(async () => {
@@ -827,24 +803,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     )}
                 </div>
                 
-                {/* Botão Carregar Mais Conversas */}
-                {hasMoreConversations && !isFetching && (
-                  <div className="p-4 border-t border-purple-900/40">
-                    <Button
-                      onClick={loadMoreConversations}
-                      disabled={isLoadingMore}
-                      variant="outline"
-                      className="w-full text-purple-400 border-purple-800/60 hover:bg-purple-900/40 disabled:opacity-50"
-                    >
-                      {isLoadingMore ? (
-                        <>
-                          <div className="animate-spin w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full mr-2"></div>
-                          Carregando mais conversas...
-                        </>
-                      ) : (
-                        `Carregar mais conversas (+${CONVERSATIONS_PER_PAGE})`
-                      )}
-                    </Button>
+                {/* Loading específico para visualização */}
+                {isLoadingConversations && (
+                  <div className="p-8 text-center">
+                    <div className="inline-flex items-center text-purple-400">
+                      <div className="animate-spin w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full mr-3"></div>
+                      <span>Carregando conversas para visualização...</span>
+                    </div>
+                    <p className="text-xs text-purple-300/60 mt-2">
+                      Preparando todas as conversas importadas
+                    </p>
                   </div>
                 )}
                 
