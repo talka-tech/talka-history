@@ -207,71 +207,112 @@ export class AutoCompressUploader {
   }
 
   async createConversations(conversationIds: string[], userId: number) {
-    // Cria conversas vazias primeiro para evitar foreign key constraint
-    console.log(`📁 Criando ${conversationIds.length} conversas...`);
+    // OTIMIZAÇÃO ULTRA-RÁPIDA: Uma única consulta para verificar conversas existentes
+    console.log(`📁 Criando ${conversationIds.length} conversas com otimização ultra-rápida...`);
     
-    for (let i = 0; i < conversationIds.length; i++) {
-      const convId = conversationIds[i];
+    const convIds = conversationIds.map(id => parseInt(id));
+    
+    // 1. BUSCA TODAS AS CONVERSAS EXISTENTES EM UMA SÓ QUERY
+    const { data: existingConversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .in('id', convIds);
+    
+    const existingIds = new Set(existingConversations?.map(conv => conv.id) || []);
+    
+    // 2. FILTRA APENAS AS QUE PRECISAM SER CRIADAS
+    const newConversations = convIds
+      .filter(id => !existingIds.has(id))
+      .map(id => ({
+        id,
+        title: `Conversa ${id}`,
+        user_id: userId
+      }));
+    
+    console.log(`📊 Conversas: ${existingIds.size} existentes, ${newConversations.length} novas`);
+    
+    // 3. INSERE TODAS AS NOVAS CONVERSAS DE UMA SÓ VEZ (BATCH INSERT)
+    if (newConversations.length > 0) {
+      const BATCH_SIZE = 100; // Supabase limite
       
-      // Verifica se a conversa já existe
-      const { data: existing } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('id', parseInt(convId))
-        .single();
-      
-      if (!existing) {
+      for (let i = 0; i < newConversations.length; i += BATCH_SIZE) {
+        const batch = newConversations.slice(i, i + BATCH_SIZE);
+        
         const { error } = await supabase
           .from('conversations')
-          .insert({
-            id: parseInt(convId),  // Converte para int4
-            title: `Conversa ${convId}`,
-            user_id: userId
-          });
+          .insert(batch);
         
         if (error) {
-          console.error(`❌ Erro ao criar conversa ${convId}:`, error);
-          throw new Error(`Erro ao criar conversa ${convId}: ${error.message}`);
+          console.error(`❌ Erro ao criar lote de conversas:`, error);
+          throw new Error(`Erro ao criar conversas: ${error.message}`);
         }
         
-        console.log(`✅ Conversa ${convId} criada (${i + 1}/${conversationIds.length})`);
-      } else {
-        console.log(`⚠️ Conversa ${convId} já existe (${i + 1}/${conversationIds.length})`);
+        console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${batch.length} conversas criadas`);
       }
     }
     
-    console.log(`🎉 Todas as ${conversationIds.length} conversas foram verificadas/criadas!`);
+    console.log(`🎉 OTIMIZAÇÃO COMPLETA: ${conversationIds.length} conversas processadas em segundos!`);
   }
 
   async updateConversations(conversationIds: string[], userId: number) {
-    // Para cada conversa, busca a última mensagem e conta (DEPOIS das mensagens serem inseridas)
-    for (const convId of conversationIds) {
-      const { data: messages, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', parseInt(convId))
-        .order('timestamp', { ascending: false })
-        .limit(1);
-
-      if (error || !messages || messages.length === 0) continue;
-
-      const lastMessage = messages[0];
-      
-      // Conta total de mensagens da conversa
-      const { count } = await supabase
-        .from('messages')
-        .select('id', { count: 'exact' })
-        .eq('conversation_id', parseInt(convId));
-
-      // Atualiza a conversa com dados reais (apenas título, que é o único campo adicional)
-      await supabase
-        .from('conversations')
-        .update({
-          title: this.generateConversationTitle(lastMessage)
-        })
-        .eq('id', parseInt(convId))
-        .eq('user_id', userId);
+    // OTIMIZAÇÃO ULTRA-RÁPIDA: Uma única query com window functions
+    console.log(`🔄 Otimizando títulos de ${conversationIds.length} conversas...`);
+    
+    const convIds = conversationIds.map(id => parseInt(id));
+    
+    // QUERY OTIMIZADA: Busca última mensagem de cada conversa em uma só consulta
+    const { data: lastMessages, error } = await supabase
+      .from('messages')
+      .select(`
+        conversation_id,
+        sender,
+        content,
+        fromMe,
+        timestamp
+      `)
+      .in('conversation_id', convIds)
+      .order('conversation_id, timestamp', { ascending: false });
+    
+    if (error) {
+      console.warn('⚠️ Erro ao buscar mensagens para atualizar títulos:', error);
+      return;
     }
+    
+    // Agrupa por conversation_id e pega a primeira (mais recente) de cada grupo
+    const lastMessageByConv = new Map();
+    lastMessages?.forEach(msg => {
+      if (!lastMessageByConv.has(msg.conversation_id)) {
+        lastMessageByConv.set(msg.conversation_id, msg);
+      }
+    });
+    
+    // BATCH UPDATE: Atualiza títulos em lotes
+    const updates = convIds.map(convId => {
+      const lastMessage = lastMessageByConv.get(convId);
+      return {
+        id: convId,
+        title: lastMessage ? this.generateConversationTitle(lastMessage) : `Conversa ${convId}`
+      };
+    });
+    
+    // Atualiza em lotes para performance
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = updates.slice(i, i + BATCH_SIZE);
+      
+      // Usa Promise.all para atualizar em paralelo
+      await Promise.all(batch.map(async (update) => {
+        await supabase
+          .from('conversations')
+          .update({ title: update.title })
+          .eq('id', update.id)
+          .eq('user_id', userId);
+      }));
+      
+      console.log(`✅ Títulos atualizados: ${Math.min(i + BATCH_SIZE, updates.length)}/${updates.length}`);
+    }
+    
+    console.log(`🎉 TÍTULOS OTIMIZADOS: ${conversationIds.length} conversas atualizadas!`);
   }
 
   generateConversationTitle(lastMessage: any): string {
