@@ -417,23 +417,10 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       return;
     }
 
-    // Verificar o tamanho do arquivo (máximo 50MB)
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    console.log('📊 File size check:', {
+    console.log('📊 File size:', {
       fileSize: file.size,
-      maxSize: maxSize,
       sizeMB: (file.size / 1024 / 1024).toFixed(2)
     });
-    
-    if (file.size > maxSize) {
-      console.error('❌ File too large:', file.size);
-      toast({
-        title: "Arquivo muito grande",
-        description: `O arquivo tem ${(file.size / 1024 / 1024).toFixed(2)}MB. Máximo permitido: 50MB.`,
-        variant: "destructive"
-      });
-      return;
-    }
 
     setIsUploading(true);
     console.log('🚀 Starting upload process...');
@@ -802,21 +789,21 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
   // O restante do componente (o return com o JSX) continua exatamente o mesmo
   return (
-    <div className="h-screen flex bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" style={{backgroundColor: '#12032d'}}>
+    <div className="h-screen flex bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950" style={{backgroundColor: '#0f0f23'}}>
         {/* Sidebar */}
-        <div className="w-80 border-r border-purple-600/30 flex flex-col bg-gradient-to-b from-purple-900/40 to-purple-800/20 backdrop-blur-sm">
+        <div className="w-80 border-r border-gray-700/40 flex flex-col bg-gradient-to-b from-gray-900/60 to-gray-800/30 backdrop-blur-sm">
             {/* Header com boas-vindas profissional */}
-            <div className="p-6 border-b border-purple-600/30">
+            <div className="p-6 border-b border-gray-700/40">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-purple-200/40 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-purple-300/50">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/20 backdrop-blur-sm flex items-center justify-center p-2 shadow-lg border border-blue-400/30">
                             <img src="/img/logo.png" alt="Talka Logo" className="w-full h-full object-contain" />
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-white flex items-center gap-2">
                                 Talka Analytics
                             </h1>
-                            <p className="text-xs text-purple-200">Análise Inteligente de Conversas</p>
+                            <p className="text-xs text-gray-400">Análise Inteligente de Conversas</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -824,7 +811,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             onClick={() => setShowSettings(!showSettings)}
                             variant="ghost"
                             size="sm"
-                            className="text-purple-200 hover:bg-purple-700/30 hover:text-white border border-purple-600/30 hover:border-purple-500/50"
+                            className="text-gray-400 hover:bg-gray-700/50 hover:text-white border border-gray-600/40 hover:border-gray-500/60"
                         >
                             <Settings className="w-4 h-4" />
                         </Button>
@@ -832,7 +819,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             onClick={onLogout}
                             variant="ghost"
                             size="sm"
-                            className="text-purple-200 hover:bg-purple-700/30 hover:text-white border border-purple-600/30 hover:border-purple-500/50"
+                            className="text-gray-400 hover:bg-gray-700/50 hover:text-white border border-gray-600/40 hover:border-gray-500/60"
                         >
                             <LogOut className="w-4 h-4" />
                         </Button>
@@ -840,16 +827,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </div>
                 
                 {/* Boas-vindas profissional */}
-                <div className="bg-gradient-to-r from-purple-800/40 to-purple-700/30 rounded-xl p-4 border border-purple-600/20 backdrop-blur-sm">
+                <div className="bg-gradient-to-r from-gray-800/60 to-gray-700/40 rounded-xl p-4 border border-gray-600/30 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                             {getCompanyDisplayName(currentUser).charAt(0)}
                         </div>
                         <div className="flex-1">
                             <h2 className="text-white font-semibold">
                                 Bem-vindo(a), {getCompanyDisplayName(currentUser)}!
                             </h2>
-                            <p className="text-purple-200 text-sm">
+                            <p className="text-gray-400 text-sm">
                                 {conversations.length} conversas disponíveis
                                 {searchTerm && ` • ${filteredConversations.length} filtradas`}
                             </p>
@@ -859,7 +846,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             </div>
 
             {/* Upload Section */}
-            <div className="p-4 border-b border-purple-600/30">
+            <div className="p-4 border-b border-gray-700/40">
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -870,7 +857,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <Button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white border border-purple-500/30"
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border border-blue-500/40 shadow-lg"
                     variant="outline"
                 >
                     <Upload className="w-4 h-4 mr-2" />
@@ -880,14 +867,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
             {/* Settings Panel */}
             {showSettings && (
-              <div className="p-4 border-b border-purple-600/30 bg-purple-800/20">
+              <div className="p-4 border-b border-gray-700/40 bg-gray-800/30">
                 <h3 className="text-white font-medium mb-3 text-sm">⚙️ Configurações</h3>
                 <div className="space-y-2">
                   <Button
                     onClick={() => setShowDeleteModal(true)}
                     variant="outline"
                     size="sm"
-                    className="w-full text-red-300 border-red-500/40 hover:bg-red-500/20 hover:text-red-200"
+                    className="w-full text-red-400 border-red-500/50 hover:bg-red-500/20 hover:text-red-300"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Apagar Todas as Conversas
@@ -897,14 +884,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             )}
 
             {/* Search */}
-            <div className="p-4 border-b border-purple-600/30">
+            <div className="p-4 border-b border-gray-700/40">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-300 w-4 h-4" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <Input
                         placeholder="Pesquisar conversas..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 bg-purple-900/30 border-purple-600/40 text-white placeholder:text-purple-300 focus:border-purple-400 backdrop-blur-sm"
+                        className="pl-10 bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-blue-500/60 backdrop-blur-sm"
                     />
                 </div>
             </div>
@@ -915,8 +902,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     {isFetching || isLoadingAfterUpload ? (
                         <div className="text-center py-8">
                             <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 border-4 border-purple-600/30 border-t-purple-400 rounded-full animate-spin mb-3"></div>
-                                <p className="text-purple-300 text-sm">
+                                <div className="w-8 h-8 border-4 border-gray-600/40 border-t-blue-500 rounded-full animate-spin mb-3"></div>
+                                <p className="text-gray-400 text-sm">
                                     {isLoadingAfterUpload ? 'Atualizando conversas...' : 'Carregando conversas...'}
                                 </p>
                             </div>
@@ -924,9 +911,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     ) : currentConversations.map((conversation) => (
                     <Card
                         key={conversation.id}
-                        className={`p-4 mb-2 cursor-pointer transition-all hover:shadow-md border-purple-600/30 bg-purple-800/20 hover:bg-purple-700/30 relative group ${
+                        className={`p-4 mb-2 cursor-pointer transition-all hover:shadow-md border-gray-700/40 bg-gray-800/30 hover:bg-gray-700/40 relative group ${
                         selectedConversation?.id === conversation.id 
-                            ? 'ring-2 ring-purple-400 bg-purple-700/40 border-purple-400/50' 
+                            ? 'ring-2 ring-blue-500/60 bg-gray-700/50 border-blue-500/40' 
                             : ''
                         }`}
                         onClick={() => setSelectedConversation(conversation)}
@@ -937,19 +924,19 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="absolute top-2 right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-purple-300 hover:text-purple-100 hover:bg-purple-600/20"
+                              className="absolute top-2 right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-200 hover:bg-gray-600/30"
                               onClick={(e) => e.stopPropagation()} // Evita selecionar a conversa
                             >
                               <MoreVertical className="w-3 h-3" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-purple-900/90 border-purple-600/50">
+                          <DropdownMenuContent align="end" className="bg-gray-800/95 border-gray-600/60">
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteConversation(conversation.id);
                               }}
-                              className="text-red-300 hover:text-red-200 hover:bg-red-500/20 cursor-pointer"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/20 cursor-pointer"
                             >
                               <Trash2 className="w-3 h-3 mr-2" />
                               Excluir conversa
@@ -962,17 +949,17 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             {conversation.title || 'Conversa sem título'}
                         </h3>
                         </div>
-                        <p className="text-xs text-purple-200 mb-2 truncate">
+                        <p className="text-xs text-gray-400 mb-2 truncate">
                         {conversation.lastMessage || 'Nenhuma mensagem'}
                         </p>
                         <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-200">
+                            <Badge variant="outline" className="text-xs border-gray-600/50 text-gray-300">
                             <MessageCircle className="w-3 h-3 mr-1" />
                             {conversation.messageCount || conversation.messages?.length || 0}
                             </Badge>
                         </div>
-                        <span className="text-xs text-purple-300">
+                        <span className="text-xs text-gray-500">
                             {conversation.lastTimestamp && conversation.lastTimestamp !== 'Invalid Date' 
                               ? new Date(conversation.lastTimestamp).toLocaleDateString('pt-BR') 
                               : ''}
@@ -982,27 +969,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     ))}
                     
                     {!isFetching && conversations.length === 0 && (
-                    <div className="text-center py-8 text-purple-300">
-                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50 text-purple-400" />
+                    <div className="text-center py-8 text-gray-400">
+                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50 text-gray-500" />
                         <p className="text-white">Nenhuma conversa encontrada</p>
-                        <p className="text-sm text-purple-300">Importe um arquivo CSV para começar</p>
+                        <p className="text-sm text-gray-400">Importe um arquivo CSV para começar</p>
                     </div>
                     )}
                     
                     {!isFetching && filteredConversations.length === 0 && conversations.length > 0 && (
-                    <div className="text-center py-8 text-purple-300">
-                        <Search className="w-12 h-12 mx-auto mb-4 opacity-50 text-purple-400" />
+                    <div className="text-center py-8 text-gray-400">
+                        <Search className="w-12 h-12 mx-auto mb-4 opacity-50 text-gray-500" />
                         <p className="text-white">Nenhuma conversa encontrada</p>
-                        <p className="text-sm text-purple-300">Tente pesquisar com outros termos</p>
+                        <p className="text-sm text-gray-400">Tente pesquisar com outros termos</p>
                     </div>
                     )}
                 </div>
                 
                 {/* Paginação */}
                 {totalPages > 1 && (
-                  <div className="p-4 border-t border-purple-600/30">
+                  <div className="p-4 border-t border-gray-700/40">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-purple-300">
+                      <p className="text-xs text-gray-400">
                         Página {currentPage} de {totalPages} • {filteredConversations.length} conversas
                       </p>
                       <div className="flex items-center gap-2">
@@ -1011,11 +998,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                           disabled={currentPage === 1}
                           variant="outline"
                           size="sm"
-                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
+                          className="text-gray-400 border-gray-600/50 hover:bg-gray-700/40 disabled:opacity-50"
                         >
                           ←
                         </Button>
-                        <span className="text-xs text-purple-200 px-2">
+                        <span className="text-xs text-gray-300 px-2">
                           {currentPage}
                         </span>
                         <Button
@@ -1023,7 +1010,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                           disabled={currentPage === totalPages}
                           variant="outline"
                           size="sm"
-                          className="text-purple-300 border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50"
+                          className="text-gray-400 border-gray-600/50 hover:bg-gray-700/40 disabled:opacity-50"
                         >
                           →
                         </Button>
@@ -1035,19 +1022,19 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col bg-purple-900/10 backdrop-blur-sm">
+        <div className="flex-1 flex flex-col bg-gray-900/20 backdrop-blur-sm">
             {selectedConversation ? (
             <>
                 {/* Chat Header */}
-                <div className="p-4 border-b border-purple-600/30 bg-purple-800/20 backdrop-blur-sm flex items-center justify-between">
+                <div className="p-4 border-b border-gray-700/40 bg-gray-800/30 backdrop-blur-sm flex items-center justify-between">
                 <div>
                     <h2 className="font-semibold text-white">{selectedConversation.title}</h2>
-                    <p className="text-sm text-purple-200">
+                    <p className="text-sm text-gray-400">
                     {selectedConversation.messageCount || selectedConversation.messages?.length || 0} mensagens
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="border-purple-500/40 text-purple-200">
+                    <Badge variant="outline" className="border-gray-600/50 text-gray-300">
                     <Calendar className="w-3 h-3 mr-1" />
                     {selectedConversation.messages && selectedConversation.messages.length > 0 
                       ? formatTimestamp(selectedConversation.messages[selectedConversation.messages.length - 1].timestamp) 
@@ -1057,26 +1044,26 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </div>
 
                 {/* Messages */}
-                <ScrollArea className="flex-1 bg-purple-900/5">
+                <ScrollArea className="flex-1 bg-gray-900/10">
                 <div className="p-6 space-y-4">
                     {(selectedConversation.messages || []).map((message) => (
                     <div key={message.id} className="animate-fade-in group">
                         <div className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] ${message.fromMe ? 'order-2' : 'order-1'}`}>
                             <div className={`flex items-center gap-2 mb-1 ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
-                            <span className="text-xs text-purple-300">
+                            <span className="text-xs text-gray-400">
                                 {formatTimestamp(message.timestamp)}
                             </span>
-                            <span className="text-sm font-medium text-purple-100">
+                            <span className="text-sm font-medium text-gray-300">
                                 {message.sender}
                             </span>
                             </div>
                             <div className={`relative p-3 rounded-lg shadow-sm ${
                             message.fromMe 
-                                ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white ml-4 border border-purple-500/30' 
-                                : 'bg-purple-800/30 border border-purple-600/40 mr-4 text-purple-100 backdrop-blur-sm'
+                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white ml-4 border border-blue-500/40' 
+                                : 'bg-gray-800/50 border border-gray-600/50 mr-4 text-gray-100 backdrop-blur-sm'
                             }`}>
-                            <div className={message.fromMe ? 'text-white' : 'text-purple-100'}>
+                            <div className={message.fromMe ? 'text-white' : 'text-gray-100'}>
                                 {renderMessageContent(message.content)}
                             </div>
                             
@@ -1089,16 +1076,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                   className={`absolute top-2 right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${
                                     message.fromMe 
                                       ? 'text-white/70 hover:text-white hover:bg-white/10' 
-                                      : 'text-purple-300 hover:text-purple-100 hover:bg-purple-600/20'
+                                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-600/20'
                                   }`}
                                 >
                                   <MoreVertical className="w-3 h-3" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-purple-900/90 border-purple-600/50">
+                              <DropdownMenuContent align="end" className="bg-gray-800/95 border-gray-600/60">
                                 <DropdownMenuItem
                                   onClick={() => handleDeleteMessage(message.id, selectedConversation.id)}
-                                  className="text-red-300 hover:text-red-200 hover:bg-red-500/20 cursor-pointer"
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-500/20 cursor-pointer"
                                 >
                                   <Trash2 className="w-3 h-3 mr-2" />
                                   Excluir mensagem
@@ -1114,11 +1101,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 </ScrollArea>
             </>
             ) : (
-            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-purple-900/20 to-purple-800/10">
+            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-900/30 to-gray-800/20">
                 <div className="text-center">
-                <MessageCircle className="w-16 h-16 mx-auto mb-4 text-purple-400 opacity-50" />
+                <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-500 opacity-50" />
                 <h3 className="text-lg font-medium mb-2 text-white">Selecione uma conversa</h3>
-                <p className="text-purple-200">
+                <p className="text-gray-400">
                     Escolha uma conversa da lista para visualizar as mensagens
                 </p>
                 </div>
@@ -1189,18 +1176,18 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         {/* Modal de Progresso do Upload */}
         {isUploading && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-gradient-to-br from-purple-900 to-purple-800 p-8 rounded-xl shadow-2xl border border-purple-600/50 max-w-md w-full mx-4">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-xl shadow-2xl border border-gray-600/60 max-w-md w-full mx-4">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 relative">
-                  <div className="absolute inset-0 border-4 border-purple-600/30 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-gray-600/40 rounded-full"></div>
                   <div 
-                    className="absolute inset-0 border-4 border-transparent border-t-purple-400 rounded-full animate-spin"
+                    className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"
                     style={{
                       animationDuration: '1.5s'
                     }}
                   ></div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-purple-300 font-bold text-sm">
+                    <span className="text-gray-300 font-bold text-sm">
                       {uploadProgress.total > 0 ? Math.round((uploadProgress.current / uploadProgress.total) * 100) : 0}%
                     </span>
                   </div>
@@ -1210,47 +1197,47 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                   Processando arquivo CSV...
                 </h3>
                 
-                <p className="text-purple-200 mb-4 text-sm leading-relaxed">
+                <p className="text-gray-300 mb-4 text-sm leading-relaxed">
                   {uploadProgress.message || 'Enviando arquivo para o servidor...'}
                 </p>
                 
                 {uploadProgress.total > 0 && (
-                  <div className="w-full bg-purple-900/50 rounded-full h-3 mb-4">
+                  <div className="w-full bg-gray-700/60 rounded-full h-3 mb-4">
                     <div 
-                      className="bg-gradient-to-r from-purple-500 to-purple-400 h-3 rounded-full transition-all duration-300 ease-out"
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
                       style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
                     ></div>
                   </div>
                 )}
                 
                 {/* Estatísticas simplificadas */}
-                <div className="bg-purple-800/30 rounded-lg p-4 mb-4">
-                  <div className="text-xs text-purple-300 mb-2">Sistema Otimizado</div>
+                <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
+                  <div className="text-xs text-gray-400 mb-2">Sistema Otimizado</div>
                   <div className="flex justify-center items-center space-x-4 text-xs">
                     <div className="text-center">
                       <div className="text-white font-semibold">Upload Direto</div>
-                      <div className="text-purple-400">Sem chunks</div>
+                      <div className="text-gray-400">Sem limites</div>
                     </div>
-                    <div className="w-1 h-6 bg-purple-600/50"></div>
+                    <div className="w-1 h-6 bg-gray-600/60"></div>
                     <div className="text-center">
                       <div className="text-white font-semibold">Processamento</div>
-                      <div className="text-purple-400">Em lote</div>
+                      <div className="text-gray-400">Em lote</div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="mt-4 text-xs text-purple-400">
-                  ⚡ Arquitetura simplificada • Processamento otimizado
+                <div className="mt-4 text-xs text-gray-500">
+                  ⚡ Sem limites de tamanho • Processamento otimizado
                 </div>
                 
                 {/* Indicador de atividade */}
                 <div className="flex items-center justify-center mt-3">
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
                   </div>
-                  <span className="ml-2 text-xs text-purple-300">Aguarde...</span>
+                  <span className="ml-2 text-xs text-gray-400">Aguarde...</span>
                 </div>
               </div>
             </div>
