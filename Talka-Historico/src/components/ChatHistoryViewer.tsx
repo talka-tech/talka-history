@@ -78,17 +78,50 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       .join(' ');
   };
 
-  // Função para buscar conversas salvas da API
-  const fetchConversations = useCallback(async () => {
-    setIsFetching(true);
+  // Estados para paginação
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreConversations, setHasMoreConversations] = useState(true);
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const CONVERSATIONS_PER_PAGE = 50;
+
+  // Função para buscar conversas salvas da API (com paginação)
+  const fetchConversations = useCallback(async (reset = false) => {
+    if (reset) {
+      setConversations([]);
+      setCurrentOffset(0);
+      setHasMoreConversations(true);
+    }
+    
+    const offset = reset ? 0 : currentOffset;
+    setIsFetching(reset); // Só mostra loading inicial no reset
+    setIsLoadingMore(!reset); // Mostra loading "carregando mais" quando não é reset
+    
     try {
-        const response = await fetch(`/api/conversations?userId=${currentUserId}`);
+        console.log(`🚀 Buscando conversas: offset=${offset}, limit=${CONVERSATIONS_PER_PAGE}`);
+        
+        const response = await fetch(
+          `/api/conversations?userId=${currentUserId}&limit=${CONVERSATIONS_PER_PAGE}&offset=${offset}`
+        );
+        
         if (!response.ok) {
-            throw new Error('Falha ao buscar conversas.');
+            throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
-        const data = await response.json();
-        setConversations(data);
+        
+        const newConversations = await response.json();
+        console.log(`✅ Recebidas ${newConversations.length} conversas`);
+        
+        if (reset) {
+          setConversations(newConversations);
+        } else {
+          setConversations(prev => [...prev, ...newConversations]);
+        }
+        
+        // Atualiza offset e verifica se tem mais
+        setCurrentOffset(offset + CONVERSATIONS_PER_PAGE);
+        setHasMoreConversations(newConversations.length === CONVERSATIONS_PER_PAGE);
+        
     } catch (error) {
+        console.error('❌ Erro ao buscar conversas:', error);
         toast({
             title: "Erro",
             description: "Não foi possível carregar o histórico de conversas.",
@@ -96,9 +129,17 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         });
     } finally {
         setIsFetching(false);
-        setIsLoadingAfterUpload(false); // Remove loading pós-upload
+        setIsLoadingMore(false);
+        setIsLoadingAfterUpload(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, currentOffset, toast]);
+
+  // Função para carregar mais conversas
+  const loadMoreConversations = useCallback(() => {
+    if (!isLoadingMore && hasMoreConversations) {
+      fetchConversations(false);
+    }
+  }, [fetchConversations, isLoadingMore, hasMoreConversations]);
 
   // Função para limpar dados
   const handleClearData = useCallback(async () => {
@@ -146,7 +187,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       // Força uma nova busca para confirmar que está vazio
       console.log('🔄 Fazendo nova busca para confirmar limpeza...');
       setTimeout(() => {
-        fetchConversations();
+        fetchConversations(true); // Reset para carregar do início
       }, 1000);
       
     } catch (error) {
@@ -275,7 +316,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   // Busca as conversas quando o componente carrega
   useEffect(() => {
     if (currentUserId) {
-        fetchConversations();
+        fetchConversations(true); // Reset para carregar do início
     }
   }, [currentUserId, fetchConversations]);
 
@@ -378,7 +419,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
       // Sucesso - atualiza conversas
       setIsLoadingAfterUpload(true);
-      fetchConversations();
+      fetchConversations(true); // Reset para carregar todas as conversas atualizadas
 
       const compressionMessage = fileSizeMB > 1 
         ? ' Compressão automática aplicada para máxima velocidade!'
@@ -785,6 +826,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     </div>
                     )}
                 </div>
+                
+                {/* Botão Carregar Mais Conversas */}
+                {hasMoreConversations && !isFetching && (
+                  <div className="p-4 border-t border-purple-900/40">
+                    <Button
+                      onClick={loadMoreConversations}
+                      disabled={isLoadingMore}
+                      variant="outline"
+                      className="w-full text-purple-400 border-purple-800/60 hover:bg-purple-900/40 disabled:opacity-50"
+                    >
+                      {isLoadingMore ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full mr-2"></div>
+                          Carregando mais conversas...
+                        </>
+                      ) : (
+                        `Carregar mais conversas (+${CONVERSATIONS_PER_PAGE})`
+                      )}
+                    </Button>
+                  </div>
+                )}
                 
                 {/* Paginação */}
                 {totalPages > 1 && (
