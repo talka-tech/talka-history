@@ -106,7 +106,7 @@ export class AutoCompressUploader {
         sender: data.fromMe === '1' ? 'Você' : (data.mobile_number || 'Desconhecido'),
         content: data.text,
         timestamp: data.message_created || new Date().toISOString(),
-        from_me: data.fromMe === '1',
+        fromMe: data.fromMe === '1',
         user_id: userId
       });
 
@@ -239,7 +239,7 @@ export class AutoCompressUploader {
   }
 
   generateConversationTitle(lastMessage: any): string {
-    if (lastMessage.from_me) {
+    if (lastMessage.fromMe) {
       return `Conversa ${lastMessage.conversation_id}`;
     }
     return lastMessage.sender || `Conversa ${lastMessage.conversation_id}`;
