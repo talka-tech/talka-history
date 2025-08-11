@@ -1,10 +1,6 @@
 {
   "version": 2,
   "functions": {
-    "api/upload-csv.ts": {
-      "maxDuration": 300,
-      "memory": 3008
-    },
     "api/upload-csv-chunk.ts": {
       "maxDuration": 300,
       "memory": 3008
@@ -14,10 +10,6 @@
     {
       "src": "/api/upload-simple",
       "dest": "/api/upload-simple.ts"
-    },
-    {
-      "src": "/api/upload-csv",
-      "dest": "/api/upload-csv.ts"
     },
     {
       "src": "/api/upload-csv-chunk",
