@@ -106,8 +106,7 @@ export class AutoCompressUploader {
         sender: data.fromMe === '1' ? 'Você' : (data.mobile_number || 'Desconhecido'),
         content: data.text,
         timestamp: data.message_created || new Date().toISOString(),
-        fromMe: data.fromMe === '1',
-        user_id: userId
+        fromMe: data.fromMe === '1'
       });
 
       processedLines++;
