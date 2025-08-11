@@ -255,36 +255,44 @@ export class AutoCompressUploader {
   }
 
   async updateConversations(conversationIds: string[], userId: number) {
-    // OTIMIZAÇÃO ULTRA-RÁPIDA: Uma única query com window functions
+    // OTIMIZAÇÃO ULTRA-RÁPIDA: Processa em lotes para evitar URLs muito longas
     console.log(`🔄 Otimizando títulos de ${conversationIds.length} conversas...`);
     
     const convIds = conversationIds.map(id => parseInt(id));
-    
-    // QUERY OTIMIZADA: Busca última mensagem de cada conversa em uma só consulta
-    const { data: lastMessages, error } = await supabase
-      .from('messages')
-      .select(`
-        conversation_id,
-        sender,
-        content,
-        fromMe,
-        timestamp
-      `)
-      .in('conversation_id', convIds)
-      .order('conversation_id, timestamp', { ascending: false });
-    
-    if (error) {
-      console.warn('⚠️ Erro ao buscar mensagens para atualizar títulos:', error);
-      return;
-    }
-    
-    // Agrupa por conversation_id e pega a primeira (mais recente) de cada grupo
     const lastMessageByConv = new Map();
-    lastMessages?.forEach(msg => {
-      if (!lastMessageByConv.has(msg.conversation_id)) {
-        lastMessageByConv.set(msg.conversation_id, msg);
+    
+    // Processa em lotes menores para evitar URLs muito longas
+    const UPDATE_BATCH_SIZE = 500; // Reduzido para evitar erro de URL longa
+    
+    for (let i = 0; i < convIds.length; i += UPDATE_BATCH_SIZE) {
+      const batch = convIds.slice(i, i + UPDATE_BATCH_SIZE);
+      console.log(`📦 Processando lote ${Math.floor(i / UPDATE_BATCH_SIZE) + 1}/${Math.ceil(convIds.length / UPDATE_BATCH_SIZE)} para títulos...`);
+      
+      // QUERY OTIMIZADA: Busca última mensagem de cada conversa em lotes
+      const { data: lastMessages, error } = await supabase
+        .from('messages')
+        .select(`
+          conversation_id,
+          sender,
+          content,
+          fromMe,
+          timestamp
+        `)
+        .in('conversation_id', batch)
+        .order('conversation_id, timestamp', { ascending: false });
+      
+      if (error) {
+        console.warn(`⚠️ Erro ao buscar mensagens para atualizar títulos (lote ${Math.floor(i / UPDATE_BATCH_SIZE) + 1}):`, error);
+        continue; // Continua com próximo lote mesmo se um falhar
       }
-    });
+
+      // Agrupa por conversation_id e pega a primeira (mais recente) de cada grupo
+      lastMessages?.forEach(msg => {
+        if (!lastMessageByConv.has(msg.conversation_id)) {
+          lastMessageByConv.set(msg.conversation_id, msg);
+        }
+      });
+    }
     
     // BATCH UPDATE: Atualiza títulos em lotes
     const updates = convIds.map(convId => {
