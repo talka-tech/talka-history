@@ -128,9 +128,14 @@ export class AutoCompressUploader {
       }
     }
 
-    if (this.onProgress) this.onProgress(70, `Salvando ${messagesToInsert.length} mensagens no banco...`);
+    if (this.onProgress) this.onProgress(70, `Criando ${conversationIds.size} conversas...`);
 
-    // **UPLOAD EM LOTES COM PROGRESSO REAL E GARANTIDO**
+    // **PRIMEIRO: CRIAR TODAS AS CONVERSAS**
+    await this.updateConversations(Array.from(conversationIds) as string[], userId);
+
+    if (this.onProgress) this.onProgress(75, `Salvando ${messagesToInsert.length} mensagens no banco...`);
+
+    // **SEGUNDO: UPLOAD DAS MENSAGENS EM LOTES**
     const BATCH_SIZE = 100;
     let totalInserted = 0;
     const totalToInsert = messagesToInsert.length;
@@ -156,10 +161,10 @@ export class AutoCompressUploader {
 
       totalInserted += batch.length;
       
-      // PROGRESSO REAL do upload (70% -> 90%)
+      // PROGRESSO REAL do upload (75% -> 100%)
       const uploadProgressPercent = (totalInserted / totalToInsert) * 100;
-      const uploadProgress = (uploadProgressPercent / 100) * 20; // 20% do total para upload
-      const currentProgress = 70 + uploadProgress;
+      const uploadProgress = (uploadProgressPercent / 100) * 25; // 25% do total para upload
+      const currentProgress = 75 + uploadProgress;
       
       console.log(`✅ Lote ${currentBatch} salvo: ${totalInserted}/${totalToInsert} mensagens (${uploadProgressPercent.toFixed(1)}%)`);
       
@@ -173,11 +178,6 @@ export class AutoCompressUploader {
       // Delay para permitir UI atualizar e não sobrecarregar o Supabase
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-
-    if (this.onProgress) this.onProgress(90, 'Finalizando... Atualizando conversas...');
-
-    // Atualiza as conversas
-    await this.updateConversations(Array.from(conversationIds) as string[], userId);
 
     if (this.onProgress) this.onProgress(100, '🎉 Upload 100% concluído com sucesso!');
 
