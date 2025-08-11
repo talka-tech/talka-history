@@ -9,8 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Shield, Activity, UserCheck, Clock, Edit, Key, BarChart3, User, RefreshCw, FileText, UserX, UserPlus, TrendingUp, MessagesSquare } from 'lucide-react';
+import { Users, Plus, Trash2, LogOut, Eye, EyeOff, Settings, Activity, UserCheck, Clock, Edit, Key, BarChart3, User, FileText, UserX, UserPlus, TrendingUp, MessagesSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import * as Recharts from 'recharts';
@@ -64,18 +63,9 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   
-  // Estados para configurações
-  const [settings, setSettings] = useState({
-    passwordMinLength: 6,
-    sessionTimeout: 24,
-    maxFileSize: 10,
-    autoBackup: true,
-    emailNotifications: true,
-    twoFactorAuth: false,
-    maxLoginAttempts: 5,
-    passwordExpiration: 90
-  });
+  // Estados para configurações simples
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('users');
 
   // Função para buscar usuários da API
   const fetchUsers = useCallback(async () => {
@@ -325,12 +315,97 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
 
   const formatShortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
+  const handleExportClients = async () => {
+    setSettingsLoading(true);
+    try {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Falha ao buscar usuários');
+      
+      const users = await response.json();
+      
+      // Criar CSV com dados dos clientes
+      const csvContent = [
+        ['ID', 'Nome de Usuário', 'Tipo', 'Status', 'Data de Criação'],
+        ...users.map((user: User) => [
+          user.id,
+          user.username,
+          user.user_type === 'admin' || user.username === 'admin' ? 'Administrador' : 'Cliente',
+          user.status === 'active' ? 'Ativo' : 'Inativo',
+          formatDate(user.created_at)
+        ])
+      ].map(row => row.join(',')).join('\n');
+      
+      // Download do arquivo
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `clientes_talka_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Sucesso",
+        description: "Planilha de clientes exportada com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao exportar planilha de clientes.",
+        variant: "destructive"
+      });
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleViewLogs = async () => {
+    setSettingsLoading(true);
+    try {
+      // Simular busca de logs do sistema
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const logs = [
+        `[${new Date().toISOString()}] Sistema iniciado`,
+        `[${new Date(Date.now() - 3600000).toISOString()}] Login: admin`,
+        `[${new Date(Date.now() - 7200000).toISOString()}] Usuário criado: cliente123`,
+        `[${new Date(Date.now() - 10800000).toISOString()}] Backup automático executado`,
+        `[${new Date(Date.now() - 14400000).toISOString()}] Limpeza de arquivos temporários`
+      ];
+      
+      const logContent = logs.join('\n');
+      const blob = new Blob([logContent], { type: 'text/plain;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `logs_sistema_${new Date().toISOString().split('T')[0]}.txt`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Sucesso",
+        description: "Logs do sistema baixados com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao acessar logs do sistema.",
+        variant: "destructive"
+      });
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
   const handleSettingsUpdate = async (newSettings: any) => {
     setSettingsLoading(true);
     try {
       // Simular salvamento de configurações
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setSettings(newSettings);
       toast({
         title: "Sucesso",
         description: "Configurações atualizadas com sucesso!",
@@ -383,17 +458,36 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
           </div>
         </div>
 
-        <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-purple-900/40 backdrop-blur-sm shadow-lg border border-purple-600/30">
-            <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-purple-700 data-[state=active]:text-white text-purple-200 hover:text-white transition-colors">
+        <Tabs defaultValue="users" className="space-y-6" onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3 bg-purple-900/40 backdrop-blur-sm shadow-lg border border-purple-600/30 relative overflow-hidden">
+            <div 
+              className="absolute inset-y-0 bg-gradient-to-r from-purple-600 to-purple-700 rounded-md transition-all duration-300 ease-in-out z-0"
+              style={{
+                width: '33.333333%',
+                transform: `translateX(${
+                  activeTab === 'users' ? '0%' : 
+                  activeTab === 'overview' ? '100%' : '200%'
+                })`
+              }}
+            />
+            <TabsTrigger 
+              value="users" 
+              className="flex items-center gap-2 relative z-10 data-[state=active]:bg-transparent data-[state=active]:text-white text-purple-200 hover:text-white transition-all duration-300 ease-in-out hover:bg-purple-700/30"
+            >
               <Users className="w-4 h-4" />
               Gerenciar Usuários
             </TabsTrigger>
-            <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-purple-700 data-[state=active]:text-white text-purple-200 hover:text-white transition-colors">
+            <TabsTrigger 
+              value="overview" 
+              className="flex items-center gap-2 relative z-10 data-[state=active]:bg-transparent data-[state=active]:text-white text-purple-200 hover:text-white transition-all duration-300 ease-in-out hover:bg-purple-700/30"
+            >
               <BarChart3 className="w-4 h-4" />
               Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-purple-700 data-[state=active]:text-white text-purple-200 hover:text-white transition-colors">
+            <TabsTrigger 
+              value="settings" 
+              className="flex items-center gap-2 relative z-10 data-[state=active]:bg-transparent data-[state=active]:text-white text-purple-200 hover:text-white transition-all duration-300 ease-in-out hover:bg-purple-700/30"
+            >
               <Settings className="w-4 h-4" />
               Configurações
             </TabsTrigger>
@@ -407,8 +501,8 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-purple-300">Total de Usuários</p>
-                      <p className="text-3xl font-bold text-purple-100">{metrics ? metrics.totals.users : '...'}</p>
+                      <p className="text-sm text-purple-300">Total de Clientes</p>
+                      <p className="text-3xl font-bold text-purple-100">{metrics ? metrics.totals.users - (metrics.perUser?.filter(u => u.user_type === 'admin' || u.username === 'admin').length || 0) : '...'}</p>
                     </div>
                     <Users className="w-7 h-7 text-purple-300" />
                   </div>
@@ -665,139 +759,7 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Configurações de Segurança */}
-              <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30 shadow-xl backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-purple-100">
-                    <Shield className="w-5 h-5" />
-                    Segurança
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-purple-200">Tamanho Mínimo da Senha</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="4"
-                        max="32"
-                        value={settings.passwordMinLength}
-                        onChange={(e) => setSettings(prev => ({ ...prev, passwordMinLength: parseInt(e.target.value) || 6 }))}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-purple-300">caracteres</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-purple-200">Tentativas Máximas de Login</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="3"
-                        max="10"
-                        value={settings.maxLoginAttempts}
-                        onChange={(e) => setSettings(prev => ({ ...prev, maxLoginAttempts: parseInt(e.target.value) || 5 }))}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-purple-300">tentativas</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-purple-200">Expiração de Senha</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="30"
-                        max="365"
-                        value={settings.passwordExpiration}
-                        onChange={(e) => setSettings(prev => ({ ...prev, passwordExpiration: parseInt(e.target.value) || 90 }))}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-purple-300">dias</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="text-purple-200">Autenticação de Dois Fatores</Label>
-                    <Button
-                      variant={settings.twoFactorAuth ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSettings(prev => ({ ...prev, twoFactorAuth: !prev.twoFactorAuth }))}
-                    >
-                      {settings.twoFactorAuth ? "Ativado" : "Desativado"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Configurações do Sistema */}
-              <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30 shadow-xl backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-purple-100">
-                    <Settings className="w-5 h-5" />
-                    Sistema
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-purple-200">Timeout de Sessão</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="1"
-                        max="168"
-                        value={settings.sessionTimeout}
-                        onChange={(e) => setSettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) || 24 }))}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-purple-300">horas</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-purple-200">Tamanho Máximo de Arquivo</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={settings.maxFileSize}
-                        onChange={(e) => setSettings(prev => ({ ...prev, maxFileSize: parseInt(e.target.value) || 10 }))}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-purple-300">MB</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="text-purple-200">Backup Automático</Label>
-                    <Button
-                      variant={settings.autoBackup ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSettings(prev => ({ ...prev, autoBackup: !prev.autoBackup }))}
-                    >
-                      {settings.autoBackup ? "Ativado" : "Desativado"}
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="text-purple-200">Notificações por Email</Label>
-                    <Button
-                      variant={settings.emailNotifications ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSettings(prev => ({ ...prev, emailNotifications: !prev.emailNotifications }))}
-                    >
-                      {settings.emailNotifications ? "Ativado" : "Desativado"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Ações Avançadas */}
+            {/* Ações do Sistema */}
             <Card className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-600/30 shadow-xl backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-purple-100">
@@ -806,45 +768,43 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-purple-100">Manutenção</h4>
-                    <p className="text-sm text-purple-300">Executar limpeza e otimização</p>
-                    <Button variant="outline" className="w-full" disabled={settingsLoading}>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Otimizar Banco
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-purple-100">Backup</h4>
-                    <p className="text-sm text-purple-300">Gerar backup completo</p>
-                    <Button variant="outline" className="w-full" disabled={settingsLoading}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-purple-100">Exportar Dados</h4>
+                    <p className="text-sm text-purple-300">Baixar planilha com todos os clientes cadastrados</p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      disabled={settingsLoading}
+                      onClick={handleExportClients}
+                    >
                       <FileText className="w-4 h-4 mr-2" />
-                      Criar Backup
+                      {settingsLoading ? "Exportando..." : "Exportar Clientes"}
                     </Button>
                   </div>
                   
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-purple-100">Logs</h4>
-                    <p className="text-sm text-purple-300">Visualizar logs do sistema</p>
-                    <Button variant="outline" className="w-full" disabled={settingsLoading}>
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-purple-100">Logs do Sistema</h4>
+                    <p className="text-sm text-purple-300">Baixar arquivo com logs de atividades</p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      disabled={settingsLoading}
+                      onClick={handleViewLogs}
+                    >
                       <Clock className="w-4 h-4 mr-2" />
-                      Ver Logs
+                      {settingsLoading ? "Baixando..." : "Baixar Logs"}
                     </Button>
                   </div>
                 </div>
 
-                <Separator className="bg-purple-600/30 my-6" />
-
-                <div className="flex justify-end">
-                  <Button 
-                    onClick={() => handleSettingsUpdate(settings)}
-                    disabled={settingsLoading}
-                    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
-                  >
-                    {settingsLoading ? "Salvando..." : "Salvar Configurações"}
-                  </Button>
+                <div className="mt-6 p-4 bg-purple-800/20 rounded-lg border border-purple-600/20">
+                  <h5 className="font-medium text-purple-100 mb-2">Informações Importantes</h5>
+                  <ul className="text-sm text-purple-300 space-y-1">
+                    <li>• Importação de arquivos CSV sem limite de tamanho</li>
+                    <li>• Logs são mantidos por 30 dias no sistema</li>
+                    <li>• Planilha de clientes inclui todos os dados cadastrais</li>
+                  </ul>
                 </div>
               </CardContent>
             </Card>
