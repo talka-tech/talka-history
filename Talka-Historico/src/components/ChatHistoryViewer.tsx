@@ -264,126 +264,179 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     }
   }, [currentUserId, fetchConversations]);
 
-  // **FUNÇÃO PARA UPLOAD EM CHUNKS - SOLUÇÃO PARA ERRO 413**
+  // **FUNÇÃO PARA UPLOAD EM CHUNKS - SUPER OTIMIZADA E RÁPIDA**
   const uploadFileInChunks = async (fileContent: string, userId: number): Promise<boolean> => {
     try {
-      const CHUNK_SIZE = 512 * 1024; // 512KB chunks para processamento mais rápido
+      const CHUNK_SIZE = 50 * 1024; // 50KB chunks para máxima velocidade
       const totalChunks = Math.ceil(fileContent.length / CHUNK_SIZE);
+      const PARALLEL_CHUNKS = 3; // Processa 3 chunks ao mesmo tempo
       
-      console.log(`[CHUNK UPLOAD] Iniciando upload de ${totalChunks} chunks de 512KB`);
+      console.log(`[FAST UPLOAD] Iniciando upload super-rápido: ${totalChunks} chunks de 50KB em paralelo`);
       
       // Inicializa progresso
-      setUploadProgress({ current: 0, total: totalChunks, message: 'Preparando upload...' });
+      setUploadProgress({ current: 0, total: totalChunks, message: 'Iniciando upload super-rápido...' });
       
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, fileContent.length);
-        const chunk = fileContent.slice(start, end);
-        const isLastChunk = i === totalChunks - 1;
+      // Processa chunks em lotes paralelos
+      for (let batchStart = 0; batchStart < totalChunks; batchStart += PARALLEL_CHUNKS) {
+        const batchEnd = Math.min(batchStart + PARALLEL_CHUNKS, totalChunks);
+        const batchPromises = [];
         
-        console.log(`[CHUNK ${i + 1}/${totalChunks}] Tamanho: ${chunk.length} caracteres`);
-        
-        // Atualiza progresso visual
-        const progressPercent = Math.round(((i + 1) / totalChunks) * 100);
-        setUploadProgress({ 
-          current: i + 1, 
-          total: totalChunks, 
-          message: `Processando pedaço ${i + 1} de ${totalChunks} (${progressPercent}%)` 
-        });
-        
-        toast({
-          title: `📤 Upload em andamento`,
-          description: `Pedaço ${i + 1}/${totalChunks} - ${progressPercent}% concluído`,
-          duration: 1500
-        });
-        
-        // Timeout específico para cada chunk (5 minutos)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          console.error(`⏰ Chunk ${i + 1} timeout após 5 minutos`);
-          controller.abort();
-        }, 300000); // 5 minutos por chunk
-        
-        // Marca tempo de início do chunk
-        const chunkStartTime = Date.now();
-        
-        console.log(`[CHUNK ${i + 1}] Enviando para /api/upload-csv...`);
-        
-        const response = await fetch('/api/upload-csv', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            csvContent: chunk, // Chunk do CSV
-            chunkIndex: i,
-            totalChunks: totalChunks,
-            isLastChunk: isLastChunk,
-            userId: userId
-          }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        const chunkProcessTime = Date.now() - chunkStartTime;
-        
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error(`[CHUNK ${i + 1}] Erro HTTP ${response.status}:`, errorData);
-          throw new Error(`Falha no pedaço ${i + 1}: ${response.status} - ${errorData}`);
+        // Cria promessas para processar chunks em paralelo
+        for (let i = batchStart; i < batchEnd; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, fileContent.length);
+          const chunk = fileContent.slice(start, end);
+          const isLastChunk = i === totalChunks - 1;
+          
+          // Função para processar um chunk individual
+          const processChunk = async (chunkIndex: number) => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+              console.error(`⏰ Chunk ${chunkIndex + 1} timeout após 2 minutos`);
+              controller.abort();
+            }, 120000); // 2 minutos apenas
+            
+            const chunkStartTime = Date.now();
+            
+            try {
+              const response = await fetch('/api/upload-csv', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  csvContent: chunk,
+                  chunkIndex: chunkIndex,
+                  totalChunks: totalChunks,
+                  isLastChunk: isLastChunk,
+                  userId: userId,
+                  chunkSize: '50KB',
+                  fastMode: true // Indica modo rápido
+                }),
+                signal: controller.signal
+              });
+              
+              clearTimeout(timeoutId);
+              const chunkProcessTime = Date.now() - chunkStartTime;
+              
+              if (!response.ok) {
+                throw new Error(`Chunk ${chunkIndex + 1}: HTTP ${response.status}`);
+              }
+              
+              const result = await response.json();
+              console.log(`[CHUNK ${chunkIndex + 1}] ✅ ${(chunkProcessTime/1000).toFixed(1)}s`);
+              
+              return { chunkIndex, result, processTime: chunkProcessTime };
+            } catch (error) {
+              clearTimeout(timeoutId);
+              throw new Error(`Chunk ${chunkIndex + 1} falhou: ${error.message}`);
+            }
+          };
+          
+          batchPromises.push(processChunk(i));
         }
         
-        const result = await response.json();
-        console.log(`[CHUNK ${i + 1}] Processado em ${chunkProcessTime}ms:`, result);
-        
-        // Atualiza progresso com detalhes em tempo real
-        const newProgress = {
-          current: i + 1,
-          total: totalChunks,
-          message: `✅ Chunk ${i + 1}/${totalChunks}: ${result.messagesFound || 0} mensagens de ${result.linesProcessed || 0} linhas (${(chunkProcessTime/1000).toFixed(1)}s)`
-        };
-        setUploadProgress(newProgress);
-        
-        // Toast com informações detalhadas 
-        toast({
-          title: `✅ Chunk ${i + 1} processado`,
-          description: `${result.messagesFound || 0} mensagens salvas • ${result.linesProcessed || 0} linhas • ${(chunkProcessTime/1000).toFixed(1)}s`,
-          duration: 2000
-        });
-        
-        if (isLastChunk) {
-          // Calcula total de mensagens processadas
-          let totalMessages = 0;
-          // Aqui você pode somar de todos os chunks se quiser
+        // Aguarda todos os chunks do lote atual
+        try {
+          const batchResults = await Promise.all(batchPromises);
           
-          setUploadProgress({ 
-            current: totalChunks, 
-            total: totalChunks, 
-            message: `🎉 Upload completo! Processamento finalizado com sucesso` 
+          // Atualiza progresso com base nos resultados
+          const completedChunks = batchEnd;
+          const progressPercent = Math.round((completedChunks / totalChunks) * 100);
+          
+          setUploadProgress({
+            current: completedChunks,
+            total: totalChunks,
+            message: `⚡ Processando super-rápido: ${completedChunks}/${totalChunks} chunks (${progressPercent}%)`
           });
           
+          // Toast otimizado
           toast({
-            title: "🎉 Upload completo!",
-            description: `Arquivo processado com sucesso! Atualizando lista de conversas...`,
-            variant: "default",
-            duration: 10000
+            title: `⚡ Upload super-rápido`,
+            description: `${completedChunks}/${totalChunks} chunks • ${progressPercent}% • 3x paralelo`,
+            duration: 800
           });
+          
+          // Se é o último lote
+          if (batchEnd === totalChunks) {
+            setUploadProgress({
+              current: totalChunks,
+              total: totalChunks,
+              message: `🎉 Upload concluído! ${totalChunks} chunks processados em paralelo`
+            });
+            
+            toast({
+              title: "🎉 Upload super-rápido concluído!",
+              description: `Arquivo processado em lotes paralelos de 50KB!`,
+              variant: "default",
+              duration: 5000
+            });
+          }
+          
+        } catch (error) {
+          console.error(`[BATCH ERROR] Lote ${batchStart}-${batchEnd}:`, error);
+          
+          // Se falhar no modo paralelo, tenta sequencial para este lote
+          console.log(`[FALLBACK] Tentando modo sequencial para lote ${batchStart}-${batchEnd}...`);
+          
+          for (let i = batchStart; i < batchEnd; i++) {
+            try {
+              const start = i * CHUNK_SIZE;
+              const end = Math.min(start + CHUNK_SIZE, fileContent.length);
+              const chunk = fileContent.slice(start, end);
+              const isLastChunk = i === totalChunks - 1;
+              
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 120000);
+              
+              const response = await fetch('/api/upload-csv', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  csvContent: chunk,
+                  chunkIndex: i,
+                  totalChunks: totalChunks,
+                  isLastChunk: isLastChunk,
+                  userId: userId,
+                  chunkSize: '50KB',
+                  fallbackMode: true
+                }),
+                signal: controller.signal
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (!response.ok) {
+                throw new Error(`Fallback chunk ${i + 1}: HTTP ${response.status}`);
+              }
+              
+              setUploadProgress({
+                current: i + 1,
+                total: totalChunks,
+                message: `🔄 Modo sequencial: chunk ${i + 1}/${totalChunks}`
+              });
+              
+            } catch (fallbackError) {
+              console.error(`[FALLBACK ERROR] Chunk ${i + 1}:`, fallbackError);
+              throw new Error(`Falha total no chunk ${i + 1} após tentativas paralela e sequencial`);
+            }
+          }
         }
         
-        // Pequena pausa entre chunks para não sobrecarregar
-        if (!isLastChunk) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+        // Pequena pausa entre lotes (reduzida drasticamente)
+        if (batchEnd < totalChunks) {
+          await new Promise(resolve => setTimeout(resolve, 50)); // 50ms apenas
         }
       }
       
       return true;
     } catch (error) {
-      console.error('[CHUNK UPLOAD ERROR]:', error);
-      setUploadProgress({ current: 0, total: 0, message: 'Erro no upload' });
+      console.error('[FAST UPLOAD ERROR]:', error);
+      setUploadProgress({ current: 0, total: 0, message: 'Erro no upload rápido' });
       
       toast({
-        title: "❌ Erro no upload",
-        description: error instanceof Error ? error.message : "Erro desconhecido durante upload em pedaços",
+        title: "❌ Erro no upload rápido",
+        description: error instanceof Error ? error.message : "Erro durante upload otimizado",
         variant: "destructive",
         duration: 10000
       });
@@ -481,31 +534,31 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       const fileSizeMB = file.size / 1024 / 1024;
       console.log(`📊 Tamanho do arquivo: ${fileSizeMB.toFixed(2)}MB`);
       
-      if (fileSizeMB > 50) {
-        console.log('📦 Arquivo grande detectado! Usando upload em chunks...');
+      if (fileSizeMB > 10) { // Reduzido de 20MB para 10MB para ativar modo rápido mais cedo
+        console.log('� Arquivo grande detectado! Usando upload super-rápido em paralelo...');
         toast({
-          title: "🚀 Arquivo grande detectado",
-          description: `Processando ${fileSizeMB.toFixed(2)}MB em pedaços menores para evitar erro 413...`,
-          duration: 5000
+          title: "🚀 Modo super-rápido ativado!",
+          description: `Processando ${fileSizeMB.toFixed(2)}MB em chunks de 50KB + processamento paralelo...`,
+          duration: 3000
         });
         
-        // Usa upload em chunks para arquivos grandes
+        // Usa upload super-rápido em chunks paralelos
         const success = await uploadFileInChunks(text, currentUserId);
         if (success) {
           setIsLoadingAfterUpload(true);
           fetchConversations();
           
           toast({
-            title: "🎉 Upload Concluído!",
-            description: `Arquivo de ${fileSizeMB.toFixed(2)}MB processado com sucesso via chunks!`,
+            title: "🎉 Upload Super-Rápido Concluído!",
+            description: `Arquivo de ${fileSizeMB.toFixed(2)}MB processado com velocidade otimizada!`,
             variant: "default",
-            duration: 10000
+            duration: 8000
           });
         }
         return; // Sai da função aqui para arquivos grandes
       }
       
-      // Envia o CSV diretamente para a API com timeout maior (apenas para arquivos < 50MB)
+      // Envia o CSV diretamente para a API com timeout maior (apenas para arquivos < 20MB)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         console.error('⏰ Request timeout after 5 minutes');
