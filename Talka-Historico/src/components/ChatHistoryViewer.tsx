@@ -92,7 +92,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     try {
         console.log(`🚀 Carregando todas as conversas para visualização...`);
         
-        const response = await fetch(`/api/conversations?userId=${currentUserId}&limit=1000`);
+        const response = await fetch(`/api/conversations?userId=${currentUserId}&limit=10000`);
         
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${response.statusText}`);

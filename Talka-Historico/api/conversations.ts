@@ -19,7 +19,7 @@ export default async function handler(request: Request) {
     try {
         const url = new URL(request.url);
         const userId = url.searchParams.get('userId');
-        const limit = parseInt(url.searchParams.get('limit') || '1000'); // Limite alto por padrão
+        const limit = parseInt(url.searchParams.get('limit') || '10000'); // Limite aumentado para suportar grandes volumes
 
         if (!userId) {
             return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -58,7 +58,7 @@ export default async function handler(request: Request) {
             .select('id, timestamp, sender, content, fromMe, conversation_id, created_at')
             .in('conversation_id', conversationIds)
             .order('conversation_id, timestamp', { ascending: true })
-            .limit(10000); // Limite para evitar timeout
+            .limit(50000); // Limite aumentado para grandes volumes
 
         if (msgError) {
             console.error('❌ Erro ao buscar mensagens:', msgError);
