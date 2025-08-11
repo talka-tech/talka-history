@@ -130,8 +130,8 @@ export class AutoCompressUploader {
 
     if (this.onProgress) this.onProgress(70, `Criando ${conversationIds.size} conversas...`);
 
-    // **PRIMEIRO: CRIAR TODAS AS CONVERSAS**
-    await this.updateConversations(Array.from(conversationIds) as string[], userId);
+    // **PRIMEIRO: CRIAR CONVERSAS VAZIAS**
+    await this.createConversations(Array.from(conversationIds) as string[], userId);
 
     if (this.onProgress) this.onProgress(75, `Salvando ${messagesToInsert.length} mensagens no banco...`);
 
@@ -179,6 +179,11 @@ export class AutoCompressUploader {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
+    if (this.onProgress) this.onProgress(95, 'Finalizando conversas...');
+
+    // **TERCEIRO: ATUALIZAR CONVERSAS COM DADOS REAIS**
+    await this.updateConversations(Array.from(conversationIds) as string[], userId);
+
     if (this.onProgress) this.onProgress(100, '🎉 Upload 100% concluído com sucesso!');
 
     const compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
@@ -201,14 +206,29 @@ export class AutoCompressUploader {
     };
   }
 
+  async createConversations(conversationIds: string[], userId: number) {
+    // Cria conversas vazias primeiro para evitar foreign key constraint
+    for (const convId of conversationIds) {
+      await supabase
+        .from('conversations')
+        .upsert({
+          id: convId,
+          title: `Conversa ${convId}`,
+          last_message: '',
+          last_timestamp: new Date().toISOString(),
+          message_count: 0,
+          user_id: userId
+        }, { onConflict: 'id' });
+    }
+  }
+
   async updateConversations(conversationIds: string[], userId: number) {
-    // Para cada conversa, busca a última mensagem e conta
+    // Para cada conversa, busca a última mensagem e conta (DEPOIS das mensagens serem inseridas)
     for (const convId of conversationIds) {
       const { data: messages, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', convId)
-        .eq('user_id', userId)
         .order('timestamp', { ascending: false })
         .limit(1);
 
@@ -220,20 +240,19 @@ export class AutoCompressUploader {
       const { count } = await supabase
         .from('messages')
         .select('id', { count: 'exact' })
-        .eq('conversation_id', convId)
-        .eq('user_id', userId);
+        .eq('conversation_id', convId);
 
-      // Upsert da conversa
+      // Atualiza a conversa com dados reais
       await supabase
         .from('conversations')
-        .upsert({
-          id: convId,
+        .update({
           title: this.generateConversationTitle(lastMessage),
           last_message: lastMessage.content?.substring(0, 100) || '',
           last_timestamp: lastMessage.timestamp,
-          message_count: count || 0,
-          user_id: userId
-        }, { onConflict: 'id' });
+          message_count: count || 0
+        })
+        .eq('id', convId)
+        .eq('user_id', userId);
     }
   }
 
