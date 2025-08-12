@@ -56,8 +56,8 @@ export default async function handler(req: any, res: any) {
     let deletedConversationsCount = 0;
 
     if (conversationIds.length > 0) {
-      // 🚀 DELETAR EM CHUNKS DE 2000 (mais rápido que 500, sem timeout)
-      const CHUNK_SIZE = 2000;
+      // � MÉTODO MICRO: Chunks de 10 (super pequenos para evitar timeout)
+      const CHUNK_SIZE = 10;
       const chunks: string[][] = [];
       for (let i = 0; i < conversationIds.length; i += CHUNK_SIZE) {
         chunks.push(conversationIds.slice(i, i + CHUNK_SIZE));
@@ -111,7 +111,7 @@ export default async function handler(req: any, res: any) {
       deletedConversations: deletedConversationsCount,
       deletedMessages: deletedMessagesCount,
       message: `${deletedConversationsCount} conversas e ${deletedMessagesCount} mensagens removidas com sucesso!`,
-      method: 'supabase-turbo-mode'
+      method: 'supabase-micro-mode'
     });
 
   } catch (error) {
