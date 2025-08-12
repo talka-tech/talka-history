@@ -26,20 +26,24 @@ export default async function handler(request: Request) {
             });
         }
 
-        console.log(`🚀 Carregando TODAS as conversas: userId=${userId}`);
+        console.log(`🚀 Carregamento PADRÃO: userId=${userId} (primeiros 1000 para performance)`);
+        console.log(`📋 LOG SISTEMA HÍBRIDO: API conversations.ts chamada - carregamento PADRÃO`);
+        console.log(`🔧 LOG DEBUG: timestamp=${new Date().toISOString()}`);
         
-        // BUSCA TODAS AS CONVERSAS SEM LIMITE
-        const { data: conversations, error: convError } = await supabase
+        // CARREGAMENTO PADRÃO: Primeiros 1000 para performance inicial
+        const { data: conversations, error } = await supabase
             .from('conversations')
             .select('id, title, user_id, created_at')
             .eq('user_id', parseInt(userId))
             .order('created_at', { ascending: false })
-            .range(0, 19999); // Até 20.000 conversas para garantir
+            .limit(1000); // Limita aos primeiros 1000 para performance
             
-        if (convError) {
-            console.error('❌ Erro ao buscar conversas:', convError);
-            throw convError;
+        if (error) {
+            console.error('❌ Erro ao buscar conversas:', error);
+            throw error;
         }
+        
+        console.log(`✅ LOG SUPABASE RETORNOU: ${conversations?.length || 0} conversas do banco`);
         
         if (!conversations || conversations.length === 0) {
             console.log('📭 Nenhuma conversa encontrada');
@@ -48,10 +52,10 @@ export default async function handler(request: Request) {
             });
         }
 
-        console.log(`📊 ${conversations.length} conversas carregadas (${conversations.length >= 1000 ? 'limite atingido' : 'total'})`);
+        console.log(`📊 CARREGAMENTO PADRÃO: ${conversations.length} conversas (primeiros 1000 para performance inicial)`);
         
-        // 🔍 LOG: Análise dos títulos das conversas retornadas do banco
-        console.log(`🔍 TÍTULOS DAS CONVERSAS RETORNADAS DO BANCO:`);
+        // 🔍 LOG: Análise dos títulos das conversas do carregamento padrão
+        console.log(`🔍 TÍTULOS DAS CONVERSAS (CARREGAMENTO PADRÃO - PRIMEIROS 1000):`);
         const firstFive = conversations.slice(0, 5);
         firstFive.forEach((conv, index) => {
             console.log(`  ${index + 1}. ID: ${conv.id} | Título: "${conv.title}" | Created: ${conv.created_at}`);

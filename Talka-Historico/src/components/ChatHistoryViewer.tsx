@@ -16,7 +16,9 @@ import {
   LogOut, 
   Trash2, 
   MoreVertical,
-  Users
+  Users,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -54,6 +56,7 @@ interface ChatHistoryViewerProps {
 
 const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistoryViewerProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [totalConversations, setTotalConversations] = useState<number>(0);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -63,6 +66,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
+  
+  // 📄 Estados para paginação visual dos primeiros 1000
+  const [currentPage, setCurrentPage] = useState(1);
+  const conversationsPerPage = 50; // 50 conversas por página para boa visualização
+  
   // 📅 Estados para filtro de data
   const [dateFilter, setDateFilter] = useState({
     startDate: '',
@@ -76,16 +84,36 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     enabled: false
   });
   
-  // Sistema SEM NENHUMA LIMITAÇÃO - carrega TODAS as conversas SEMPRE
-  const conversationsPerPage = useMemo(() => {
-    // SEMPRE mostra TODAS as conversas sem limite
-    return 999999; // SEM LIMITE NUNCA
-  }, []);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Instância do uploader com compressão automática
   const autoUploader = useRef(new AutoCompressUploader());
+
+  // Função para buscar total de conversas (COUNT)
+  const fetchTotalConversations = useCallback(async () => {
+    try {
+      console.log(`📊 Buscando total de conversas no banco...`);
+      
+      const response = await fetch(`/api/total-conversations?userId=${currentUserId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`📊 Total de conversas no banco: ${data.total}`);
+      setTotalConversations(data.total);
+      
+    } catch (error) {
+      console.error('❌ Erro ao buscar total de conversas:', error);
+      setTotalConversations(0);
+    }
+  }, [currentUserId]);
 
   // Função para extrair nome da empresa do username
   const getCompanyDisplayName = (username: string) => {
@@ -98,7 +126,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
   // Estados simplificados (removendo paginação complexa)
 
-  // Função para buscar conversas salvas da API (simplificada, sem paginação)
+  // Função para buscar conversas salvas da API - HÍBRIDA: 1000 padrão + busca individual
   const fetchConversations = useCallback(async (reset = false, searchQuery = '') => {
     if (reset) {
       setConversations([]);
@@ -106,19 +134,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     
     try {
         console.log(`🚀 Carregando conversas para visualização...`);
+        console.log(`📋 LOG SISTEMA HÍBRIDO FRONTEND: fetchConversations chamado`);
+        console.log(`🔧 LOG DEBUG: timestamp=${new Date().toISOString()}, searchQuery="${searchQuery}", reset=${reset}`);
         
         let response;
         
-        // Carrega TODAS as conversas sempre
+        // 🔍 SISTEMA HÍBRIDO: Busca específica VS carregamento padrão
         if (searchQuery.trim()) {
-            console.log(`🔍 BUSCA DIRETA por: "${searchQuery}"`);
-            // Busca direta no banco
+            console.log(`🔍 BUSCA INDIVIDUAL NO BANCO para número: "${searchQuery}"`);
+            console.log(`📞 Consultando Supabase diretamente para encontrar número específico entre as 11k conversas...`);
+            console.log(`🎯 LOG IMPORTANTE: Vai chamar API search-conversations (busca entre TODAS)`);
+            
+            // Busca específica que vai procurar em TODAS as conversas
             response = await fetch(`/api/search-conversations?userId=${currentUserId}&q=${encodeURIComponent(searchQuery)}&_=${Date.now()}`);
         } else {
-            // Carrega TODAS as conversas do usuário
-            console.log(`📋 CARREGANDO TODAS AS CONVERSAS`);
+            // Carregamento padrão - primeiros 1000 para performance inicial
+            console.log(`📋 CARREGAMENTO PADRÃO - Primeiros 1000 para performance inicial`);
+            console.log(`🎯 LOG IMPORTANTE: Vai chamar API conversations (primeiros 1000)`);
             response = await fetch(`/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
         }
+        
+        console.log(`📡 LOG RESPONSE STATUS: ${response.status} ${response.ok ? '✅' : '❌'}`);
         
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${response.statusText}`);
@@ -135,7 +171,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             allConversations = responseData;
         }
         
-        console.log(`✅ ${allConversations.length} conversas carregadas para visualização`);
+        if (searchQuery.trim()) {
+            console.log(`🎯 BUSCA INDIVIDUAL: ${allConversations.length} conversas encontradas para "${searchQuery}" (pesquisou entre todas as 11k)`);
+            console.log(`🔍 LOG RESULTADO BUSCA: ${allConversations.length > 0 ? 'SUCESSO' : 'NENHUM RESULTADO'}`);
+        } else {
+            console.log(`✅ CARREGAMENTO PADRÃO: ${allConversations.length} conversas (primeiros 1000 para performance inicial)`);
+            console.log(`📊 LOG RESULTADO PADRÃO: ${allConversations.length === 1000 ? 'LIMITE ATINGIDO' : allConversations.length + ' TOTAL'}`);
+        }
+        
+        console.log(`🎉 LOG FINAL: setConversations vai receber ${allConversations.length} conversas`);
         
         // 🔍 LOG DETALHADO: Analisa as primeiras 3 conversas recebidas
         console.group('🔍 ANÁLISE DETALHADA DAS CONVERSAS RECEBIDAS:');
@@ -346,25 +390,34 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   // Busca as conversas quando o componente carrega
   useEffect(() => {
     if (currentUserId) {
+        console.log(`🚀 Iniciando carregamento: usuário ${currentUserId}`);
+        fetchTotalConversations(); // Busca total no banco
         fetchConversations(true); // Reset para carregar do início
     }
-  }, [currentUserId, fetchConversations]);
+  }, [currentUserId, fetchConversations, fetchTotalConversations]);
 
-  // BUSCA EM TEMPO REAL: Executa busca direta quando usuário digita
+  // BUSCA EM TEMPO REAL: Sistema híbrido - padrão (1000) vs busca individual (todas as 11k)
   useEffect(() => {
     if (!currentUserId) return;
     
+    console.log(`🔄 LOG BUSCA TEMPO REAL: searchTerm="${searchTerm}", length=${searchTerm.length}`);
+    
     // Debounce: espera 500ms após parar de digitar
     const timeoutId = setTimeout(() => {
-      // BUSCA: executa com 3+ caracteres
+      // BUSCA INDIVIDUAL: executa com 3+ caracteres para procurar entre TODAS as 11k conversas
       if (searchTerm.trim().length >= 3) {
-        console.log(`🔍 EXECUTANDO BUSCA DIRETA: "${searchTerm}"`);
+        console.log(`🔍 BUSCA INDIVIDUAL NA BASE COMPLETA: "${searchTerm}" (procura entre todas as 11k)`);
+        console.log(`🎯 LOG TRIGGER: Vai executar fetchConversations com busca individual`);
         fetchConversations(true, searchTerm);
       } 
-      // VOLTAR AO PADRÃO: campo vazio - carrega TODAS
+      // VOLTAR AO PADRÃO: campo vazio - carrega primeiros 1000 para performance
       else if (searchTerm.trim().length === 0) {
-        console.log(`🔄 VOLTANDO PARA TODAS AS CONVERSAS`);
+        console.log(`🔄 VOLTANDO PARA CARREGAMENTO PADRÃO (primeiros 1000)`);
+        console.log(`📋 LOG TRIGGER: Vai executar fetchConversations padrão`);
         fetchConversations(true);
+      }
+      else {
+        console.log(`⏸️ LOG: Aguardando mais caracteres (atual: ${searchTerm.length}, mínimo: 3)`);
       }
     }, 500);
 
@@ -696,8 +749,73 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     return filtered;
   }, [conversations, dateFilter]);
 
-  // MOSTRA TODAS AS CONVERSAS SEM LIMITAÇÃO
-  const currentConversations = filteredConversations; // SEM SLICE = SEM LIMITE
+  // 📄 PAGINAÇÃO: Para carregamento padrão (primeiros 1000) aplicamos paginação visual
+  // Para busca individual, mostra todos os resultados sem paginação
+  const { currentConversations, totalPages, hasNextPage, hasPrevPage } = useMemo(() => {
+    const isSearchActive = searchTerm.trim().length >= 3;
+    
+    console.log(`📄 PAGINAÇÃO LOG:`, {
+      isSearchActive,
+      searchTerm: searchTerm.trim(),
+      filteredLength: filteredConversations.length,
+      currentPage,
+      conversationsPerPage
+    });
+    
+    if (isSearchActive) {
+      // 🔍 BUSCA ATIVA: Mostra todos os resultados da busca individual
+      console.log(`🔍 BUSCA ATIVA: Mostrando ${filteredConversations.length} resultados da busca individual`);
+      return {
+        currentConversations: filteredConversations,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false
+      };
+    } else {
+      // 📄 CARREGAMENTO PADRÃO: Aplica paginação nos primeiros 1000
+      const startIndex = (currentPage - 1) * conversationsPerPage;
+      const endIndex = startIndex + conversationsPerPage;
+      const paginatedConversations = filteredConversations.slice(startIndex, endIndex);
+      const totalPages = Math.ceil(filteredConversations.length / conversationsPerPage);
+      
+      console.log(`📄 PAGINAÇÃO PADRÃO:`, {
+        startIndex,
+        endIndex,
+        paginatedCount: paginatedConversations.length,
+        totalPages,
+        currentPage
+      });
+      
+      return {
+        currentConversations: paginatedConversations,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1
+      };
+    }
+  }, [filteredConversations, currentPage, conversationsPerPage, searchTerm]);
+
+  // 📄 Funções de paginação
+  const nextPage = useCallback(() => {
+    console.log(`📄 PRÓXIMA PÁGINA: ${currentPage} → ${currentPage + 1}`);
+    setCurrentPage(prev => prev + 1);
+  }, [currentPage]);
+
+  const prevPage = useCallback(() => {
+    console.log(`📄 PÁGINA ANTERIOR: ${currentPage} → ${currentPage - 1}`);
+    setCurrentPage(prev => prev - 1);
+  }, [currentPage]);
+
+  const goToPage = useCallback((page: number) => {
+    console.log(`📄 IR PARA PÁGINA: ${currentPage} → ${page}`);
+    setCurrentPage(page);
+  }, [currentPage]);
+
+  // 🔄 Reset página quando muda busca ou filtros
+  useEffect(() => {
+    console.log(`🔄 RESET PÁGINA: Voltando para página 1 (busca: "${searchTerm}", filtros: ${JSON.stringify(dateFilter)})`);
+    setCurrentPage(1);
+  }, [searchTerm, dateFilter]);
 
   const formatTimestamp = useCallback((timestamp: string) => {
     if (!timestamp || timestamp === 'Invalid Date') return '';
@@ -800,26 +918,21 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     </div>
                 </div>
                 
-                {/* Boas-vindas profissional */}
-                <div className="bg-gradient-to-r from-black/80 rounded-xl p-4 border backdrop-blur-sm" style={{backgroundColor: '#13012a', borderColor: '#13012a'}}>
+                {/* Boas-vindas simplificado */}
+                <div className="bg-gradient-to-r from-black/80 rounded-xl p-3 border backdrop-blur-sm" style={{backgroundColor: '#13012a', borderColor: '#13012a'}}>
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg" style={{background: 'linear-gradient(to right, #13012a, #2d1b4e)'}}>
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg" style={{background: 'linear-gradient(to right, #13012a, #2d1b4e)'}}>
                             {getCompanyDisplayName(currentUser).charAt(0)}
                         </div>
                         <div className="flex-1">
-                            <h2 className="text-white font-semibold">
-                                Bem-vindo(a), {getCompanyDisplayName(currentUser)}!
+                            <h2 className="text-white font-medium text-sm">
+                                Bem-vindo, {getCompanyDisplayName(currentUser)}!
                             </h2>
-                            <p className="text-purple-300/70 text-sm">
-                                📊 <strong>{conversations.length} conversas carregadas</strong>
-                                {searchTerm && ` • ${filteredConversations.length} por busca`}
-                                {dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate) && 
-                                  ` • ${filteredConversations.length} no período`
-                                }
-                                {conversations.length > 100 && !searchTerm && !dateFilter.enabled && (
-                                    <span className="block text-yellow-400/80 text-xs mt-1">
-                                        💡 <strong>Todas as suas conversas estão carregadas!</strong> Use busca por número ou filtros de data para encontrar específicas
-                                    </span>
+                            <p className="text-purple-300/70 text-xs">
+                                {searchTerm ? (
+                                    `🔍 ${filteredConversations.length} encontradas por busca individual`
+                                ) : (
+                                    `📊 ${conversations.length} de ${totalConversations} conversas • Página ${currentPage}/${totalPages}`
                                 )}
                             </p>
                         </div>
@@ -998,7 +1111,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400/70 w-4 h-4" />
                     <Input
-                        placeholder="Digite o número para buscar..."
+                        placeholder="Digite o número para buscar entre TODAS as 11k conversas..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-black/60 border-purple-800/60 text-white placeholder:text-purple-400/60 focus:border-purple-600/80 backdrop-blur-sm"
@@ -1106,6 +1219,75 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         <div className="flex items-center gap-2 text-purple-300 text-xs">
                             <Search className="w-4 h-4" />
                             <span>💡 Com {conversations.length} conversas, use a busca para encontrar números específicos!</span>
+                        </div>
+                    </div>
+                    )}
+                    
+                    {/* 📄 PAGINAÇÃO - Apenas para carregamento padrão */}
+                    {!isFetching && !searchTerm.trim() && totalPages > 1 && (
+                    <div className="mx-2 mb-4 p-4 bg-black/40 border border-purple-800/30 rounded-lg">
+                        <div className="flex items-center justify-between text-purple-300 text-sm mb-3">
+                            <span>📄 Página {currentPage} de {totalPages}</span>
+                            <span className="text-xs text-purple-400/70">
+                                {((currentPage - 1) * conversationsPerPage) + 1}-{Math.min(currentPage * conversationsPerPage, filteredConversations.length)} de {filteredConversations.length}
+                            </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-center gap-2">
+                            <Button
+                                onClick={prevPage}
+                                disabled={!hasPrevPage}
+                                variant="outline"
+                                size="sm"
+                                className="text-purple-300 border-purple-700/40 hover:bg-purple-800/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <ChevronLeft className="w-4 h-4 mr-1" />
+                                Anterior
+                            </Button>
+                            
+                            {/* Números das páginas */}
+                            <div className="flex gap-1">
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum;
+                                    if (totalPages <= 5) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage <= 3) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i;
+                                    } else {
+                                        pageNum = currentPage - 2 + i;
+                                    }
+                                    
+                                    const isActive = pageNum === currentPage;
+                                    return (
+                                        <Button
+                                            key={pageNum}
+                                            onClick={() => goToPage(pageNum)}
+                                            variant={isActive ? "default" : "outline"}
+                                            size="sm"
+                                            className={`w-8 h-8 p-0 text-xs ${
+                                                isActive 
+                                                    ? 'bg-purple-600 text-white border-purple-500' 
+                                                    : 'text-purple-300 border-purple-700/40 hover:bg-purple-800/20'
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                            
+                            <Button
+                                onClick={nextPage}
+                                disabled={!hasNextPage}
+                                variant="outline"
+                                size="sm"
+                                className="text-purple-300 border-purple-700/40 hover:bg-purple-800/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Próxima
+                                <ChevronRight className="w-4 h-4 ml-1" />
+                            </Button>
                         </div>
                     </div>
                     )}

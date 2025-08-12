@@ -28,6 +28,9 @@ export default async function handler(request: Request) {
         }
 
         console.log(`🔍 BUSCA DIRETA: userId=${userId}, termo="${searchTerm}"`);
+        console.log(`📋 LOG SISTEMA HÍBRIDO: API search-conversations.ts chamada - BUSCA INDIVIDUAL`);
+        console.log(`🔧 LOG DEBUG: timestamp=${new Date().toISOString()}`);
+        console.log(`🎯 LOG IMPORTANTE: Esta API vai buscar entre TODAS as conversas (sem limite 1000)`);
         
         // BUSCA DIRETA: Procura em TODAS as conversas do usuário
         const { data: conversations, error: convError } = await supabase
@@ -42,6 +45,8 @@ export default async function handler(request: Request) {
             console.error('❌ Erro na busca:', convError);
             throw convError;
         }
+        
+        console.log(`✅ LOG SUPABASE BUSCA RETORNOU: ${conversations?.length || 0} conversas encontradas`);
 
         if (!conversations || conversations.length === 0) {
             console.log(`📭 Nenhuma conversa encontrada para: "${searchTerm}"`);
