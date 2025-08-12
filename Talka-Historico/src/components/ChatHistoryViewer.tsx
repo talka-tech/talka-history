@@ -109,21 +109,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         
         let response;
         
-        // Se há termo de busca, usa API de busca direta
+        // Carrega TODAS as conversas sempre
         if (searchQuery.trim()) {
             console.log(`🔍 BUSCA DIRETA por: "${searchQuery}"`);
-            
-            // BUSCA ESPECIAL POR ID DE CONVERSA: #6000, #10000, etc.
-            if (searchQuery.trim().startsWith('#')) {
-                const conversationId = searchQuery.trim().substring(1); // Remove o #
-                console.log(`🎯 BUSCA POR ID DE CONVERSA: ${conversationId}`);
-                response = await fetch(`/api/conversations?userId=${currentUserId}&conversationId=${encodeURIComponent(conversationId)}&_=${Date.now()}`);
-            } else {
-                // BUSCA NORMAL POR TÍTULO/NÚMERO
-                response = await fetch(`/api/search-conversations?userId=${currentUserId}&q=${encodeURIComponent(searchQuery)}&_=${Date.now()}`);
-            }
+            // Busca direta no banco
+            response = await fetch(`/api/search-conversations?userId=${currentUserId}&q=${encodeURIComponent(searchQuery)}&_=${Date.now()}`);
         } else {
-            // Senão, carrega as 1000 mais recentes
+            // Carrega TODAS as conversas do usuário
+            console.log(`📋 CARREGANDO TODAS AS CONVERSAS`);
             response = await fetch(`/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
         }
         
@@ -363,19 +356,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     
     // Debounce: espera 500ms após parar de digitar
     const timeoutId = setTimeout(() => {
-      // BUSCA POR ID: executa imediatamente (#6000, #10000, etc)
-      if (searchTerm.trim().startsWith('#') && searchTerm.trim().length >= 2) {
-        console.log(`🎯 EXECUTANDO BUSCA POR ID: "${searchTerm}"`);
-        fetchConversations(true, searchTerm);
-      }
-      // BUSCA NORMAL: executa com 3+ caracteres
-      else if (searchTerm.trim().length >= 3) {
+      // BUSCA: executa com 3+ caracteres
+      if (searchTerm.trim().length >= 3) {
         console.log(`🔍 EXECUTANDO BUSCA DIRETA: "${searchTerm}"`);
         fetchConversations(true, searchTerm);
       } 
-      // VOLTAR AO PADRÃO: campo vazio
+      // VOLTAR AO PADRÃO: campo vazio - carrega TODAS
       else if (searchTerm.trim().length === 0) {
-        console.log(`🔄 VOLTANDO PARA CONVERSAS PADRÃO`);
+        console.log(`🔄 VOLTANDO PARA TODAS AS CONVERSAS`);
         fetchConversations(true);
       }
     }, 500);
@@ -823,14 +811,14 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 Bem-vindo(a), {getCompanyDisplayName(currentUser)}!
                             </h2>
                             <p className="text-purple-300/70 text-sm">
-                                📊 <strong>{conversations.length} conversas exibidas</strong> {conversations.length >= 1000 && `das ${Math.floor(conversations.length / 1000) * 1000}+ disponíveis`}
+                                📊 <strong>{conversations.length} conversas carregadas</strong>
                                 {searchTerm && ` • ${filteredConversations.length} por busca`}
                                 {dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate) && 
                                   ` • ${filteredConversations.length} no período`
                                 }
-                                {conversations.length >= 1000 && !searchTerm && !dateFilter.enabled && (
+                                {conversations.length > 100 && !searchTerm && !dateFilter.enabled && (
                                     <span className="block text-yellow-400/80 text-xs mt-1">
-                                        💡 <strong>Dica:</strong> Use busca por número, #ID (ex: #6000) ou filtros de data para encontrar conversas específicas
+                                        💡 <strong>Todas as suas conversas estão carregadas!</strong> Use busca por número ou filtros de data para encontrar específicas
                                     </span>
                                 )}
                             </p>
@@ -1010,7 +998,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400/70 w-4 h-4" />
                     <Input
-                        placeholder="Digite número ou #ID (ex: #6000)..."
+                        placeholder="Digite o número para buscar..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-black/60 border-purple-800/60 text-white placeholder:text-purple-400/60 focus:border-purple-600/80 backdrop-blur-sm"
@@ -1108,7 +1096,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     <div className="text-center py-8 text-purple-300/70">
                         <Search className="w-12 h-12 mx-auto mb-4 opacity-50 text-purple-400/60" />
                         <p className="text-white">Nenhum resultado encontrado</p>
-                        <p className="text-sm text-purple-300/60">Digite um número específico ou #ID: (71) 9644-0261 ou #6000</p>
+                        <p className="text-sm text-purple-300/60">Digite um número específico: (71) 9644-0261</p>
                     </div>
                     )}
                     

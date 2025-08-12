@@ -19,7 +19,6 @@ export default async function handler(request: Request) {
     try {
         const url = new URL(request.url);
         const userId = url.searchParams.get('userId');
-        const conversationId = url.searchParams.get('conversationId'); // NOVO: busca por ID específico
 
         if (!userId) {
             return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -27,39 +26,15 @@ export default async function handler(request: Request) {
             });
         }
 
-        // BUSCA POR ID DE CONVERSA ESPECÍFICA
-        if (conversationId) {
-            console.log(`🎯 Buscando conversa específica ID: ${conversationId} para usuário: ${userId}`);
-            
-            const { data: conversation, error: convError } = await supabase
-                .from('conversations')
-                .select('id, title, user_id, created_at')
-                .eq('user_id', parseInt(userId))
-                .eq('id', conversationId)
-                .single();
-                
-            if (convError) {
-                console.log(`❌ Conversa ID ${conversationId} não encontrada:`, convError);
-                return new Response(JSON.stringify([]), {
-                    status: 200, headers: { 'Content-Type': 'application/json' }
-                });
-            }
-            
-            console.log(`✅ Conversa ID ${conversationId} encontrada:`, conversation.title);
-            return new Response(JSON.stringify([conversation]), {
-                status: 200, headers: { 'Content-Type': 'application/json' }
-            });
-        }
-
-        console.log(`🚀 Carregando conversas: userId=${userId} (usando .range() para bypass do limite 1000)`);
+        console.log(`🚀 Carregando TODAS as conversas: userId=${userId}`);
         
-        // SOLUÇÃO SIMPLES: Use .range() para buscar mais que 1000
+        // BUSCA TODAS AS CONVERSAS SEM LIMITE
         const { data: conversations, error: convError } = await supabase
             .from('conversations')
             .select('id, title, user_id, created_at')
             .eq('user_id', parseInt(userId))
             .order('created_at', { ascending: false })
-            .range(0, 14999); // Busca até 15.000 conversas direto
+            .range(0, 19999); // Até 20.000 conversas para garantir
             
         if (convError) {
             console.error('❌ Erro ao buscar conversas:', convError);
