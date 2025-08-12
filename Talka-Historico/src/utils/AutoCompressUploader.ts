@@ -87,6 +87,7 @@ export class AutoCompressUploader {
     const messagesToInsert: any[] = [];
     const conversationIds = new Set(); // Só adiciona conversas que têm mensagens válidas
     const conversationMessageCount = new Map(); // Track mensagens por conversa para debug
+    const conversationPhones = new Map(); // NOVO: Armazena o número de telefone de cada conversa
     let processedLines = 0;
     const totalLines = lines.length - 1; // Excluindo header
 
@@ -107,6 +108,11 @@ export class AutoCompressUploader {
 
       // SÓ ADICIONA À CONVERSA QUANDO TEM MENSAGEM VÁLIDA
       conversationIds.add(data.chat_id);
+      
+      // NOVO: Armazena o número de telefone da conversa
+      if (data.mobile_number && data.mobile_number.trim() && data.mobile_number.startsWith('+')) {
+        conversationPhones.set(data.chat_id, data.mobile_number.trim());
+      }
       
       // Track para debug
       const currentCount = conversationMessageCount.get(data.chat_id) || 0;
@@ -147,6 +153,7 @@ export class AutoCompressUploader {
     console.log(`   🔧 Linhas corrigidas: ${lines.length}`);
     console.log(`   📝 Mensagens válidas: ${messagesToInsert.length}`);
     console.log(`   💬 Conversas com mensagens válidas: ${conversationIds.size}`);
+    console.log(`   📞 Conversas com números identificados: ${conversationPhones.size}`);
     
     // Top 10 conversas com mais mensagens
     const sortedConversations = Array.from(conversationMessageCount.entries())
@@ -158,6 +165,11 @@ export class AutoCompressUploader {
 
     // **PRIMEIRO: CRIAR CONVERSAS VAZIAS**
     await this.createConversations(Array.from(conversationIds) as string[], userId);
+
+    if (this.onProgress) this.onProgress(75, `Salvando ${messagesToInsert.length} mensagens no banco...`);
+
+    // **PRIMEIRO: CRIAR CONVERSAS VAZIAS**
+    await this.createConversations(Array.from(conversationIds) as string[], userId, conversationPhones);
 
     if (this.onProgress) this.onProgress(75, `Salvando ${messagesToInsert.length} mensagens no banco...`);
 
@@ -187,9 +199,9 @@ export class AutoCompressUploader {
 
       totalInserted += batch.length;
       
-      // PROGRESSO REAL do upload (75% -> 100%)
+      // PROGRESSO REAL do upload (75% -> 95%)
       const uploadProgressPercent = (totalInserted / totalToInsert) * 100;
-      const uploadProgress = (uploadProgressPercent / 100) * 25; // 25% do total para upload
+      const uploadProgress = (uploadProgressPercent / 100) * 20; // 20% do total para upload
       const currentProgress = 75 + uploadProgress;
       
       console.log(`✅ Lote ${currentBatch} salvo: ${totalInserted}/${totalToInsert} mensagens (${uploadProgressPercent.toFixed(1)}%)`);
@@ -205,11 +217,6 @@ export class AutoCompressUploader {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
-    if (this.onProgress) this.onProgress(95, 'Finalizando conversas...');
-
-    // **TERCEIRO: ATUALIZAR CONVERSAS COM DADOS REAIS**
-    await this.updateConversations(Array.from(conversationIds) as string[], userId);
-
     if (this.onProgress) this.onProgress(100, '🎉 Upload 100% concluído com sucesso!');
 
     const compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
@@ -218,23 +225,25 @@ export class AutoCompressUploader {
     console.log(`\n🎉 UPLOAD COMPLETO:`);
     console.log(`   ✅ ${totalInserted} mensagens salvas`);
     console.log(`   ✅ ${conversationIds.size} conversas criadas`);
-    console.log(`   🗜️ Compressão pako: ${compressionRatio}% redução`);
+    console.log(`   � ${conversationPhones.size} números de telefone identificados`);
+    console.log(`   �🗜️ Compressão pako: ${compressionRatio}% redução`);
     console.log(`   📊 ${this.formatBytes(originalSize)} → ${this.formatBytes(compressedSize)}`);
 
     return {
       success: true,
       totalMessages: totalInserted,
       conversations: conversationIds.size,
+      phonesIdentified: conversationPhones.size,
       originalSize: this.formatBytes(originalSize),
       compressedSize: this.formatBytes(compressedSize),
       compressionRatio: `${compressionRatio}%`,
-      message: `🎉 ${totalInserted} mensagens de ${conversationIds.size} conversas processadas! Compressão pako: ${compressionRatio}% de redução`
+      message: `🎉 ${totalInserted} mensagens de ${conversationIds.size} conversas processadas! ${conversationPhones.size} números identificados. Compressão: ${compressionRatio}%`
     };
   }
 
-  async createConversations(conversationIds: string[], userId: number) {
+  async createConversations(conversationIds: string[], userId: number, conversationPhones?: Map<string, string>) {
     // OTIMIZAÇÃO ULTRA-RÁPIDA: Uma única consulta para verificar conversas existentes
-    console.log(`📁 Criando ${conversationIds.length} conversas com otimização ultra-rápida...`);
+    console.log(`📁 Criando ${conversationIds.length} conversas com números de telefone...`);
     
     const convIds = conversationIds.map(id => parseInt(id));
     
@@ -249,13 +258,19 @@ export class AutoCompressUploader {
     // 2. FILTRA APENAS AS QUE PRECISAM SER CRIADAS
     const newConversations = convIds
       .filter(id => !existingIds.has(id))
-      .map(id => ({
-        id,
-        title: `Conversa ${id}`,
-        user_id: userId
-      }));
+      .map(id => {
+        const phoneNumber = conversationPhones?.get(id.toString());
+        const title = phoneNumber ? this.formatPhoneNumber(phoneNumber) : `Conversa ${id}`;
+        
+        return {
+          id,
+          title,
+          user_id: userId
+        };
+      });
     
     console.log(`📊 Conversas: ${existingIds.size} existentes, ${newConversations.length} novas`);
+    console.log(`📞 Números identificados: ${conversationPhones?.size || 0}/${conversationIds.length}`);
     
     // 3. INSERE TODAS AS NOVAS CONVERSAS DE UMA SÓ VEZ (BATCH INSERT)
     if (newConversations.length > 0) {
@@ -274,128 +289,44 @@ export class AutoCompressUploader {
         }
         
         console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${batch.length} conversas criadas`);
+        
+        // Log das primeiras 3 conversas do lote para debug
+        const firstThree = batch.slice(0, 3);
+        firstThree.forEach(conv => {
+          console.log(`   📞 Conversa ${conv.id}: "${conv.title}"`);
+        });
       }
     }
     
-    console.log(`🎉 OTIMIZAÇÃO COMPLETA: ${conversationIds.length} conversas processadas em segundos!`);
+    console.log(`🎉 CONVERSAS CRIADAS: ${conversationIds.length} processadas com títulos corretos!`);
   }
 
-  async updateConversations(conversationIds: string[], userId: number) {
-    // OTIMIZAÇÃO ULTRA-RÁPIDA: Processa em lotes para evitar URLs muito longas
-    console.log(`🔄 Otimizando títulos de ${conversationIds.length} conversas...`);
+  formatPhoneNumber(phoneNumber: string): string {
+    // Remove espaços e caracteres especiais, mantém apenas números e +
+    const cleaned = phoneNumber.replace(/[^\d+]/g, '');
     
-    const convIds = conversationIds.map(id => parseInt(id));
-    const conversationData = new Map(); // Armazena dados para gerar títulos
-    
-    // Processa em lotes menores para evitar URLs muito longas
-    const UPDATE_BATCH_SIZE = 500; // Reduzido para evitar erro de URL longa
-    
-    for (let i = 0; i < convIds.length; i += UPDATE_BATCH_SIZE) {
-      const batch = convIds.slice(i, i + UPDATE_BATCH_SIZE);
-      console.log(`📦 Processando lote ${Math.floor(i / UPDATE_BATCH_SIZE) + 1}/${Math.ceil(convIds.length / UPDATE_BATCH_SIZE)} para títulos...`);
+    // Se é um número brasileiro (+55...)
+    if (cleaned.startsWith('+55') && cleaned.length > 12) {
+      const withoutCountry = cleaned.substring(3); // Remove +55
       
-      // QUERY OTIMIZADA: Busca informações das conversas incluindo mobile_number
-      const { data: messages, error } = await supabase
-        .from('messages')
-        .select(`
-          conversation_id,
-          sender,
-          content,
-          fromMe,
-          timestamp
-        `)
-        .in('conversation_id', batch)
-        .order('conversation_id, timestamp', { ascending: false });
-      
-      if (error) {
-        console.warn(`⚠️ Erro ao buscar mensagens para atualizar títulos (lote ${Math.floor(i / UPDATE_BATCH_SIZE) + 1}):`, error);
-        continue; // Continua com próximo lote mesmo se um falhar
-      }
-
-      // Agrupa por conversation_id e coleta informações
-      messages?.forEach(msg => {
-        if (!conversationData.has(msg.conversation_id)) {
-          // Para cada conversa, procura a primeira mensagem recebida (não enviada) que tem o número
-          const senderWithNumber = msg.sender && msg.sender.startsWith('+') ? msg.sender : null;
-          conversationData.set(msg.conversation_id, {
-            lastMessage: msg,
-            phoneNumber: senderWithNumber
-          });
-        } else {
-          // Atualiza o número do telefone se encontrar um melhor
-          const current = conversationData.get(msg.conversation_id);
-          if (!current.phoneNumber && msg.sender && msg.sender.startsWith('+')) {
-            current.phoneNumber = msg.sender;
-            conversationData.set(msg.conversation_id, current);
-          }
-        }
-      });
-    }
-    
-    // BATCH UPDATE: Atualiza títulos em lotes
-    const updates = convIds.map(convId => {
-      const data = conversationData.get(convId);
-      return {
-        id: convId,
-        title: data ? this.generateConversationTitle(data.lastMessage, data.phoneNumber) : `Conversa ${convId}`
-      };
-    });
-    
-    // Atualiza em lotes para performance
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
-      const batch = updates.slice(i, i + BATCH_SIZE);
-      
-      // Usa Promise.all para atualizar em paralelo
-      await Promise.all(batch.map(async (update) => {
-        await supabase
-          .from('conversations')
-          .update({ title: update.title })
-          .eq('id', update.id)
-          .eq('user_id', userId);
-      }));
-      
-      console.log(`✅ Títulos atualizados: ${Math.min(i + BATCH_SIZE, updates.length)}/${updates.length}`);
-    }
-    
-    console.log(`🎉 TÍTULOS OTIMIZADOS: ${conversationIds.length} conversas atualizadas!`);
-  }
-
-  generateConversationTitle(lastMessage: any, phoneNumber?: string): string {
-    // Prioriza o número de telefone direto se disponível
-    if (phoneNumber && phoneNumber.startsWith('+55') && phoneNumber.length > 10) {
-      // Formata número brasileiro
-      const cleaned = phoneNumber.replace('+55', '');
-      if (cleaned.length >= 11) {
+      if (withoutCountry.length >= 11) {
         // Formato: (XX) 9XXXX-XXXX
-        return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 3)}${cleaned.substring(3, 7)}-${cleaned.substring(7)}`;
-      } else if (cleaned.length === 10) {
+        const area = withoutCountry.substring(0, 2);
+        const first = withoutCountry.substring(2, 3);
+        const middle = withoutCountry.substring(3, 7);
+        const last = withoutCountry.substring(7, 11);
+        return `(${area}) ${first}${middle}-${last}`;
+      } else if (withoutCountry.length === 10) {
         // Formato: (XX) XXXX-XXXX
-        return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6)}`;
+        const area = withoutCountry.substring(0, 2);
+        const middle = withoutCountry.substring(2, 6);
+        const last = withoutCountry.substring(6, 10);
+        return `(${area}) ${middle}-${last}`;
       }
     }
     
-    // Fallback para o sender da última mensagem
-    if (lastMessage && !lastMessage.fromMe) {
-      const sender = lastMessage.sender || `Conversa ${lastMessage.conversation_id}`;
-      
-      // Se o sender é um número completo (+55...), formata melhor
-      if (sender.startsWith('+55') && sender.length > 10) {
-        const cleaned = sender.replace('+55', '');
-        if (cleaned.length >= 11) {
-          // Formato: (XX) 9XXXX-XXXX
-          return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 3)}${cleaned.substring(3, 7)}-${cleaned.substring(7)}`;
-        } else if (cleaned.length === 10) {
-          // Formato: (XX) XXXX-XXXX
-          return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6)}`;
-        }
-      }
-      
-      return sender;
-    }
-    
-    // Último fallback
-    return lastMessage ? `Conversa ${lastMessage.conversation_id}` : 'Conversa sem título';
+    // Se não conseguiu formatar, retorna o número original
+    return phoneNumber;
   }
 
   getSenderName(data: any): string {
