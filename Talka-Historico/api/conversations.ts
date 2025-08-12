@@ -19,7 +19,7 @@ export default async function handler(request: Request) {
     try {
         const url = new URL(request.url);
         const userId = url.searchParams.get('userId');
-        const limit = parseInt(url.searchParams.get('limit') || '10000'); // Limite aumentado para suportar grandes volumes
+        const limit = parseInt(url.searchParams.get('limit') || '15000'); // Limite aumentado para suportar grandes volumes
 
         if (!userId) {
             return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -29,13 +29,13 @@ export default async function handler(request: Request) {
 
         console.log(`🚀 Carregando conversas: userId=${userId}, limit=${limit}`);
         
-        // PRIMEIRA QUERY: Busca conversas (otimizado)
+        // PRIMEIRA QUERY: Busca conversas (otimizado) - FORÇA LIMITE ALTO
         const { data: conversations, error: convError } = await supabase
             .from('conversations')
             .select('id, title, user_id, created_at')
             .eq('user_id', parseInt(userId))
             .order('created_at', { ascending: false })
-            .limit(limit);
+            .limit(Math.max(limit, 20000)); // Força pelo menos 20.000
 
         if (convError) {
             console.error('❌ Erro ao buscar conversas:', convError);
@@ -49,6 +49,8 @@ export default async function handler(request: Request) {
             });
         }
 
+        console.log(`📊 CONVERSAS RETORNADAS: ${conversations.length} de ${userId}`);
+        
         // 🔍 LOG: Análise dos títulos das conversas retornadas do banco
         console.log(`🔍 TÍTULOS DAS CONVERSAS RETORNADAS DO BANCO:`);
         const firstFive = conversations.slice(0, 5);
