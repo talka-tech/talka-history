@@ -42,6 +42,7 @@ interface Conversation {
   messageCount: number;
   lastMessage: string;
   lastTimestamp: string;
+  created_at?: string; // Data de criação da conversa
   messages: Message[];
 }
 
@@ -553,20 +554,35 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     return result;
   }, []);
 
+  // Função para normalizar números removendo formatação para busca flexível
+  const normalizePhoneNumber = useCallback((phone: string): string => {
+    return phone.replace(/[^\d]/g, ''); // Remove tudo que não é dígito
+  }, []);
+
   const filteredConversations = useMemo(() => 
     conversations.filter(conv => {
       if (!conv) return false;
       
-      const titleMatch = conv.title?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+      const searchTermLower = searchTerm.toLowerCase();
+      const searchTermNumbers = normalizePhoneNumber(searchTerm);
+      
+      // Busca normal no título
+      const titleMatch = conv.title?.toLowerCase().includes(searchTermLower) || false;
+      
+      // Busca flexível em números de telefone no título (remove formatação)
+      const phoneMatch = searchTermNumbers.length >= 3 ? 
+        normalizePhoneNumber(conv.title || '').includes(searchTermNumbers) : false;
+      
       const participantsMatch = conv.participants?.some(p => 
-        p?.toLowerCase().includes(searchTerm.toLowerCase())
-      ) || false;
-      const messagesMatch = conv.messages?.some(m => 
-        m?.content?.toLowerCase().includes(searchTerm.toLowerCase())
+        p?.toLowerCase().includes(searchTermLower)
       ) || false;
       
-      return titleMatch || participantsMatch || messagesMatch;
-    }), [conversations, searchTerm]);
+      const messagesMatch = conv.messages?.some(m => 
+        m?.content?.toLowerCase().includes(searchTermLower)
+      ) || false;
+      
+      return titleMatch || phoneMatch || participantsMatch || messagesMatch;
+    }), [conversations, searchTerm, normalizePhoneNumber]);
 
   // Paginação com carregamento lazy
   const totalPages = Math.ceil(filteredConversations.length / conversationsPerPage);
@@ -740,7 +756,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400/70 w-4 h-4" />
                     <Input
-                        placeholder="Pesquisar conversas..."
+                        placeholder="Pesquisar por número, nome ou mensagem..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-black/60 border-purple-800/60 text-white placeholder:text-purple-400/60 focus:border-purple-600/80 backdrop-blur-sm"
@@ -812,9 +828,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             </Badge>
                         </div>
                         <span className="text-xs text-purple-400/50">
-                            {conversation.lastTimestamp && conversation.lastTimestamp !== 'Invalid Date' 
-                              ? new Date(conversation.lastTimestamp).toLocaleDateString('pt-BR') 
-                              : ''}
+                            {conversation.created_at 
+                              ? new Date(conversation.created_at).toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit', 
+                                  year: 'numeric'
+                                })
+                              : conversation.lastTimestamp && conversation.lastTimestamp !== 'Invalid Date' 
+                                ? new Date(conversation.lastTimestamp).toLocaleDateString('pt-BR')
+                                : ''}
                         </span>
                         </div>
                     </Card>
