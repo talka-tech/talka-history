@@ -64,7 +64,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const [currentPage, setCurrentPage] = useState(1);
-  const [conversationsPerPage] = useState(10);
+  
+  // Sistema de paginação adaptativo baseado no número total de conversas
+  const conversationsPerPage = useMemo(() => {
+    const total = conversations.length;
+    if (total <= 100) return total; // Mostra todas se ≤ 100
+    if (total <= 1000) return 50;   // 50 por página para 100-1000
+    if (total <= 5000) return 100;  // 100 por página para 1000-5000
+    return 200; // 200 por página para > 5000 conversas
+  }, [conversations.length]);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Instância do uploader com compressão automática
@@ -590,10 +599,10 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const endIndex = startIndex + conversationsPerPage;
   const currentConversations = filteredConversations.slice(startIndex, endIndex);
 
-  // Reset página quando filtro muda
+  // Reset página quando filtro muda ou quando carrega novas conversas
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, conversations.length]);
 
   const formatTimestamp = useCallback((timestamp: string) => {
     if (!timestamp || timestamp === 'Invalid Date') return '';
@@ -706,6 +715,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             <p className="text-purple-300/70 text-sm">
                                 {conversations.length} conversas disponíveis
                                 {searchTerm && ` • ${filteredConversations.length} filtradas`}
+                                {totalPages > 1 && ` • ${conversationsPerPage}/página`}
                             </p>
                         </div>
                     </div>
