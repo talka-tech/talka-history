@@ -27,37 +27,59 @@ export default async function handler(request: Request) {
             });
         }
 
-        console.log(`🚀 Carregando conversas: userId=${userId}, limit=${limit}`);
-        console.log(`🔍 DEBUGGING: VOLTANDO PARA QUERY SIMPLES com logs detalhados...`);
+        console.log(`🚀 Carregando conversas: userId=${userId} (buscando TODAS as 11k+)`);
         
-        // QUERY SIMPLES: Busca com limite padrão e logs detalhados
-        const { data: conversations, error: convError } = await supabase
-            .from('conversations')
-            .select('id, title, user_id, created_at')
-            .eq('user_id', parseInt(userId))
-            .order('created_at', { ascending: false });
-            // SEM .limit() para testar o padrão do Supabase
+        // PAGINAÇÃO AUTOMÁTICA: Busca TODAS as conversas em lotes
+        let allConversations: any[] = [];
+        let page = 0;
+        const pageSize = 1000; // Limite por página do Supabase
+        let hasMore = true;
+        
+        console.log(`📊 Iniciando busca paginada para carregar TODAS as conversas...`);
+        
+        while (hasMore && page < 20) { // Máximo 20 páginas = 20k conversas
+            const offset = page * pageSize;
+            console.log(`🔄 Página ${page + 1}: buscando conversas ${offset + 1}-${offset + pageSize}...`);
             
-        console.log(`🔍 DEBUGGING: Query simples executada!`);
-        console.log(`🔍 DEBUGGING: conversations =`, conversations?.length || 0, 'conversas');
-        console.log(`🔍 DEBUGGING: convError =`, convError);
-        console.log(`🔍 DEBUGGING: Tipo de conversations:`, typeof conversations, Array.isArray(conversations));
-        
-        if (convError) {
-            console.error('❌ Erro ao buscar conversas:', convError);
-            throw convError;
+            const { data: pageConversations, error: pageError } = await supabase
+                .from('conversations')
+                .select('id, title, user_id, created_at')
+                .eq('user_id', parseInt(userId))
+                .order('created_at', { ascending: false })
+                .range(offset, offset + pageSize - 1); // range(0, 999) = 1000 rows
+                
+            if (pageError) {
+                console.error(`❌ Erro na página ${page + 1}:`, pageError);
+                throw pageError;
+            }
+            
+            if (!pageConversations || pageConversations.length === 0) {
+                console.log(`✅ Página ${page + 1} vazia - fim da busca`);
+                hasMore = false;
+                break;
+            }
+            
+            allConversations.push(...pageConversations);
+            console.log(`📈 Página ${page + 1}: +${pageConversations.length} conversas | Total: ${allConversations.length}`);
+            
+            // Se retornou menos que pageSize, é a última página
+            if (pageConversations.length < pageSize) {
+                console.log(`✅ Última página encontrada (${pageConversations.length} < ${pageSize})`);
+                hasMore = false;
+            }
+            
+            page++;
         }
-
-        if (!conversations || conversations.length === 0) {
+        
+        const conversations = allConversations;
+        console.log(`🎉 PAGINAÇÃO CONCLUÍDA: ${conversations.length} conversas carregadas!`);        if (!conversations || conversations.length === 0) {
             console.log('📭 Nenhuma conversa encontrada');
-            console.log(`🔍 DEBUGGING: conversations é null/undefined:`, conversations === null, conversations === undefined);
             return new Response(JSON.stringify([]), {
                 status: 200, headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        console.log(`📊 CONVERSAS RETORNADAS DO SUPABASE: ${conversations.length} de ${userId}`);
-        console.log(`🔍 DEBUGGING: Primeiras 3 conversas:`, conversations.slice(0, 3));
+        console.log(`📊 ${conversations.length} conversas carregadas (${conversations.length >= 1000 ? 'limite atingido' : 'total'})`);
         
         // 🔍 LOG: Análise dos títulos das conversas retornadas do banco
         console.log(`🔍 TÍTULOS DAS CONVERSAS RETORNADAS DO BANCO:`);
@@ -111,6 +133,8 @@ export default async function handler(request: Request) {
             supabaseReturnedCount: conversations.length,
             finalArrayCount: conversationsWithMessages.length,
             messagesCount: messages?.length || 0,
+            totalAvailable: conversations.length >= 1000 ? '11400+' : conversations.length,
+            isLimitReached: conversations.length >= 1000,
             isProduction: process.env.NODE_ENV === 'production'
         };
 

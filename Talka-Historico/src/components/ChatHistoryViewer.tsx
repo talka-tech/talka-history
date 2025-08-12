@@ -99,46 +99,39 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   // Estados simplificados (removendo paginação complexa)
 
   // Função para buscar conversas salvas da API (simplificada, sem paginação)
-  const fetchConversations = useCallback(async (reset = false) => {
+  const fetchConversations = useCallback(async (reset = false, searchQuery = '') => {
     if (reset) {
       setConversations([]);
     }
     
     try {
-        console.log(`🚀 Carregando todas as conversas para visualização...`);
-        console.log(`🔍 DEBUGGING FRONTEND: userId=${currentUserId}`);
-        console.log(`🔍 DEBUGGING FRONTEND: URL sendo chamada:`, `/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
+        console.log(`🚀 Carregando conversas para visualização...`);
         
-        const response = await fetch(`/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
+        let response;
         
-        console.log(`🔍 DEBUGGING FRONTEND: response.ok =`, response.ok);
-        console.log(`🔍 DEBUGGING FRONTEND: response.status =`, response.status);
-        console.log(`🔍 DEBUGGING FRONTEND: response.headers =`, Object.fromEntries(response.headers.entries()));
+        // Se há termo de busca, usa API de busca direta
+        if (searchQuery.trim()) {
+            console.log(`🔍 BUSCA DIRETA por: "${searchQuery}"`);
+            response = await fetch(`/api/search-conversations?userId=${currentUserId}&q=${encodeURIComponent(searchQuery)}&_=${Date.now()}`);
+        } else {
+            // Senão, carrega as 1000 mais recentes
+            response = await fetch(`/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
+        }
         
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
         
-        console.log(`🔍 DEBUGGING FRONTEND: Iniciando response.json()...`);
         const responseData = await response.json();
-        console.log(`🔍 DEBUGGING FRONTEND: response.json() concluído!`);
-        console.log(`🔍 DEBUGGING FRONTEND: responseData =`, responseData);
         
         // Verifica se é o formato novo com debug
         let allConversations;
         if (responseData.conversations && responseData.debug) {
-            console.log(`🔍 DEBUGGING FRONTEND: Formato com debug detectado!`);
-            console.log(`🔍 DEBUGGING FRONTEND: Debug info:`, responseData.debug);
+            console.log(`� API Debug:`, responseData.debug);
             allConversations = responseData.conversations;
         } else {
-            console.log(`🔍 DEBUGGING FRONTEND: Formato normal detectado!`);
             allConversations = responseData;
         }
-        
-        console.log(`🔍 DEBUGGING FRONTEND: allConversations =`, allConversations);
-        console.log(`🔍 DEBUGGING FRONTEND: typeof allConversations =`, typeof allConversations);
-        console.log(`🔍 DEBUGGING FRONTEND: Array.isArray(allConversations) =`, Array.isArray(allConversations));
-        console.log(`🔍 DEBUGGING FRONTEND: allConversations.length =`, allConversations?.length);
         
         console.log(`✅ ${allConversations.length} conversas carregadas para visualização`);
         
@@ -354,6 +347,24 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         fetchConversations(true); // Reset para carregar do início
     }
   }, [currentUserId, fetchConversations]);
+
+  // BUSCA EM TEMPO REAL: Executa busca direta quando usuário digita
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    // Debounce: espera 500ms após parar de digitar
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim().length >= 3) {
+        console.log(`🔍 EXECUTANDO BUSCA DIRETA: "${searchTerm}"`);
+        fetchConversations(true, searchTerm);
+      } else if (searchTerm.trim().length === 0) {
+        console.log(`🔄 VOLTANDO PARA CONVERSAS PADRÃO`);
+        fetchConversations(true);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, currentUserId, fetchConversations]);
 
   // **NOVA FUNÇÃO DE UPLOAD COM COMPRESSÃO AUTOMÁTICA**
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -675,44 +686,10 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       });
     }
     
-    // 🔍 FILTRO POR BUSCA depois
-    if (!searchTerm.trim()) return filtered;
-    
-    const searchTermLower = searchTerm.toLowerCase();
-    const searchTermNumbers = normalizePhoneNumber(searchTerm);
-    
-    return filtered.filter(conv => {
-      if (!conv) return false;
-      
-      // 🎯 PRIORIDADE: Busca por número de telefone (mais eficiente)
-      if (searchTermNumbers.length >= 4) { // Mínimo 4 dígitos para busca de número
-        const normalizedTitle = normalizePhoneNumber(conv.title || '');
-        // Busca exata ou parcial no número
-        if (normalizedTitle.includes(searchTermNumbers)) {
-          return true;
-        }
-        
-        // Busca em participantes (números)
-        const participantMatch = conv.participants?.some(p => 
-          normalizePhoneNumber(p).includes(searchTermNumbers)
-        ) || false;
-        
-        if (participantMatch) return true;
-      }
-      
-      // Busca textual secundária (título, participantes, mensagens)
-      const titleMatch = conv.title?.toLowerCase().includes(searchTermLower) || false;
-      const participantsMatch = conv.participants?.some(p => 
-        p?.toLowerCase().includes(searchTermLower)
-      ) || false;
-      
-      // Só busca em mensagens se for termo textual (não numérico)
-      const messagesMatch = searchTermNumbers.length < 4 ? 
-        conv.messages?.some(m => m?.content?.toLowerCase().includes(searchTermLower)) || false : false;
-      
-      return titleMatch || participantsMatch || messagesMatch;
-    });
-  }, [conversations, searchTerm, dateFilter, normalizePhoneNumber]);
+    // 🔍 BUSCA: Agora feita diretamente no banco via API
+    // Retorna todas as conversas carregadas (já filtradas pela API se há busca)
+    return filtered;
+  }, [conversations, dateFilter]);
 
   // MOSTRA TODAS AS CONVERSAS SEM LIMITAÇÃO
   const currentConversations = filteredConversations; // SEM SLICE = SEM LIMITE
@@ -829,11 +806,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 Bem-vindo(a), {getCompanyDisplayName(currentUser)}!
                             </h2>
                             <p className="text-purple-300/70 text-sm">
-                                {conversations.length} conversas disponíveis
+                                📊 <strong>{conversations.length} conversas exibidas</strong> das {conversations.length >= 1000 ? '11.400+' : conversations.length} disponíveis
                                 {searchTerm && ` • ${filteredConversations.length} por busca`}
                                 {dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate) && 
                                   ` • ${filteredConversations.length} no período`
                                 }
+                                {conversations.length >= 1000 && !searchTerm && !dateFilter.enabled && (
+                                    <span className="block text-yellow-400/80 text-xs mt-1">
+                                        💡 <strong>Dica:</strong> Use a busca por número ou filtros de data para encontrar conversas específicas
+                                    </span>
+                                )}
                             </p>
                         </div>
                     </div>
