@@ -101,6 +101,25 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         const allConversations = await response.json();
         console.log(`✅ ${allConversations.length} conversas carregadas para visualização`);
         
+        // 🔍 LOG DETALHADO: Analisa as primeiras 3 conversas recebidas
+        console.group('🔍 ANÁLISE DETALHADA DAS CONVERSAS RECEBIDAS:');
+        allConversations.slice(0, 3).forEach((conv, index) => {
+          console.log(`📋 Conversa ${index + 1}:`, {
+            id: conv.id,
+            title: conv.title,
+            created_at: conv.created_at,
+            messageCount: conv.messages?.length || 0,
+            firstMessage: conv.messages?.[0] ? {
+              sender: conv.messages[0].sender,
+              content: conv.messages[0].content?.substring(0, 50),
+              fromMe: conv.messages[0].fromMe,
+              timestamp: conv.messages[0].timestamp
+            } : 'Nenhuma mensagem',
+            participantsFound: conv.messages ? [...new Set(conv.messages.map(m => m.sender))].join(', ') : 'N/A'
+          });
+        });
+        console.groupEnd();
+        
         setConversations(allConversations);
         
     } catch (error) {
@@ -393,9 +412,28 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
       console.log('🎉 Upload concluído com sucesso:', result);
 
+      // 🔍 LOG DETALHADO: Analisa o resultado do upload
+      console.group('🔍 ANÁLISE DO RESULTADO DO UPLOAD:');
+      console.log('📊 Estatísticas:', {
+        totalMessages: result.totalMessages,
+        conversations: result.conversations,
+        phonesIdentified: result.phonesIdentified,
+        compressionRatio: result.compressionRatio,
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize
+      });
+      console.log('📋 Resultado completo:', result);
+      console.groupEnd();
+
       // Sucesso - atualiza conversas
       setIsLoadingAfterUpload(true);
-      fetchConversations(true); // Reset para carregar todas as conversas atualizadas
+      
+      // 🔍 Aguarda um pouco antes de buscar as conversas para garantir que foram salvas
+      console.log('⏳ Aguardando 2 segundos antes de buscar conversas...');
+      setTimeout(() => {
+        console.log('🔄 Iniciando busca de conversas após upload...');
+        fetchConversations(true); // Reset para carregar todas as conversas atualizadas
+      }, 2000);
 
       const compressionMessage = fileSizeMB > 1 
         ? ' Compressão automática aplicada para máxima velocidade!'

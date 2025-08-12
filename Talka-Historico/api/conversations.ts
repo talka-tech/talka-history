@@ -49,6 +49,16 @@ export default async function handler(request: Request) {
             });
         }
 
+        // 🔍 LOG: Análise dos títulos das conversas retornadas do banco
+        console.log(`🔍 TÍTULOS DAS CONVERSAS RETORNADAS DO BANCO:`);
+        const firstFive = conversations.slice(0, 5);
+        firstFive.forEach((conv, index) => {
+            console.log(`  ${index + 1}. ID: ${conv.id} | Título: "${conv.title}" | Created: ${conv.created_at}`);
+        });
+        if (conversations.length > 5) {
+            console.log(`  ... e mais ${conversations.length - 5} conversas`);
+        }
+
         const conversationIds = conversations.map(c => c.id);
         console.log(`📋 Buscando mensagens para ${conversationIds.length} conversas...`);
 

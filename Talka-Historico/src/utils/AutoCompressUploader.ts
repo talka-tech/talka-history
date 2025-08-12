@@ -112,6 +112,11 @@ export class AutoCompressUploader {
       // NOVO: Armazena o número de telefone da conversa
       if (data.mobile_number && data.mobile_number.trim() && data.mobile_number.startsWith('+')) {
         conversationPhones.set(data.chat_id, data.mobile_number.trim());
+        
+        // 🔍 LOG: Primeira vez que captura um número para uma conversa
+        if (!conversationMessageCount.has(data.chat_id)) {
+          console.log(`📞 NÚMERO CAPTURADO: Conversa ${data.chat_id} → ${data.mobile_number.trim()}`);
+        }
       }
       
       // Track para debug
@@ -262,6 +267,13 @@ export class AutoCompressUploader {
         const phoneNumber = conversationPhones?.get(id.toString());
         const title = phoneNumber ? this.formatPhoneNumber(phoneNumber) : `Conversa ${id}`;
         
+        // 🔍 LOG: Processo de criação de título
+        console.log(`📋 CRIANDO CONVERSA: ID ${id}`, {
+          phoneNumber: phoneNumber || 'N/A',
+          title: title,
+          hasPhone: !!phoneNumber
+        });
+        
         return {
           id,
           title,
@@ -274,27 +286,47 @@ export class AutoCompressUploader {
     
     // 3. INSERE TODAS AS NOVAS CONVERSAS DE UMA SÓ VEZ (BATCH INSERT)
     if (newConversations.length > 0) {
+      console.log(`💾 INSERINDO ${newConversations.length} CONVERSAS NO SUPABASE...`);
+      
+      // Log detalhado das primeiras 5 conversas que serão inseridas
+      console.log(`🔍 PREVIEW DAS CONVERSAS QUE SERÃO INSERIDAS:`);
+      const preview = newConversations.slice(0, 5);
+      preview.forEach((conv, index) => {
+        console.log(`  ${index + 1}. ID: ${conv.id} | Título: "${conv.title}" | User: ${conv.user_id}`);
+      });
+      if (newConversations.length > 5) {
+        console.log(`  ... e mais ${newConversations.length - 5} conversas`);
+      }
+      
       const BATCH_SIZE = 100; // Supabase limite
       
       for (let i = 0; i < newConversations.length; i += BATCH_SIZE) {
         const batch = newConversations.slice(i, i + BATCH_SIZE);
         
-        const { error } = await supabase
+        console.log(`📤 ENVIANDO LOTE ${Math.floor(i/BATCH_SIZE) + 1} com ${batch.length} conversas...`);
+        
+        const { error, data } = await supabase
           .from('conversations')
-          .insert(batch);
+          .insert(batch)
+          .select('id, title'); // Retorna o que foi inserido
         
         if (error) {
           console.error(`❌ Erro ao criar lote de conversas:`, error);
           throw new Error(`Erro ao criar conversas: ${error.message}`);
         }
         
-        console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${batch.length} conversas criadas`);
+        console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${batch.length} conversas inseridas no banco`);
         
-        // Log das primeiras 3 conversas do lote para debug
-        const firstThree = batch.slice(0, 3);
-        firstThree.forEach(conv => {
-          console.log(`   📞 Conversa ${conv.id}: "${conv.title}"`);
-        });
+        // Log das conversas inseridas para verificar se os títulos estão corretos
+        if (data && data.length > 0) {
+          console.log(`🔍 VERIFICAÇÃO DO QUE FOI INSERIDO NO BANCO:`);
+          const firstThree = data.slice(0, 3);
+          firstThree.forEach(conv => {
+            console.log(`   ✅ ID ${conv.id}: "${conv.title}"`);
+          });
+        } else {
+          console.log(`⚠️ Dados inseridos não retornados pelo Supabase`);
+        }
       }
     }
     
