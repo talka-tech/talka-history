@@ -63,7 +63,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
-  const [currentPage, setCurrentPage] = useState(1);
   // 📅 Estados para filtro de data
   const [dateFilter, setDateFilter] = useState({
     startDate: '',
@@ -77,15 +76,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     enabled: false
   });
   
-  // Sistema SEM paginação - foco na busca por número específico
+  // Sistema SEM NENHUMA LIMITAÇÃO - carrega TODAS as conversas SEMPRE
   const conversationsPerPage = useMemo(() => {
-    // Se tem termo de busca OU filtro de data ativo, mostra TODOS os resultados
-    if (searchTerm.trim() || dateFilter.enabled) {
-      return 999999; // Sem limite quando tem filtros
-    }
-    // Se não tem busca, mostra apenas os primeiros 50 para performance inicial
-    return 50;
-  }, [searchTerm, dateFilter.enabled]);
+    // SEMPRE mostra TODAS as conversas sem limite
+    return 999999; // SEM LIMITE NUNCA
+  }, []);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -693,16 +688,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     });
   }, [conversations, searchTerm, dateFilter, normalizePhoneNumber]);
 
-  // Paginação com carregamento lazy
-  const totalPages = Math.ceil(filteredConversations.length / conversationsPerPage);
-  const startIndex = (currentPage - 1) * conversationsPerPage;
-  const endIndex = startIndex + conversationsPerPage;
-  const currentConversations = filteredConversations.slice(startIndex, endIndex);
-
-  // Reset página quando filtro muda ou quando carrega novas conversas
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, dateFilter, conversations.length]);
+  // MOSTRA TODAS AS CONVERSAS SEM LIMITAÇÃO
+  const currentConversations = filteredConversations; // SEM SLICE = SEM LIMITE
 
   const formatTimestamp = useCallback((timestamp: string) => {
     if (!timestamp || timestamp === 'Invalid Date') return '';
@@ -821,7 +808,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 {dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate) && 
                                   ` • ${filteredConversations.length} no período`
                                 }
-                                {totalPages > 1 && !searchTerm && !dateFilter.enabled && ` • ${conversationsPerPage}/página`}
                             </p>
                         </div>
                     </div>
@@ -1111,45 +1097,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     </div>
                     )}
                 </div>
-                
-                {/* Paginação - só aparece sem busca ativa nem filtro de data */}
-                {totalPages > 1 && !searchTerm.trim() && !dateFilter.enabled && (
-                  <div className="p-4 border-t border-purple-900/40">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-purple-300/70">
-                        {searchTerm.trim() 
-                          ? `🔍 ${filteredConversations.length} resultado(s) por busca` 
-                          : dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate)
-                            ? `📅 ${filteredConversations.length} conversa(s) no período`
-                            : `Página ${currentPage} de ${totalPages} • ${conversations.length} conversas carregadas`
-                        }
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                          variant="outline"
-                          size="sm"
-                          className="text-purple-400/70 border-purple-800/60 hover:bg-purple-900/40 disabled:opacity-50"
-                        >
-                          ←
-                        </Button>
-                        <span className="text-xs text-purple-300 px-2">
-                          {currentPage}
-                        </span>
-                        <Button
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                          variant="outline"
-                          size="sm"
-                          className="text-purple-400/70 border-purple-800/60 hover:bg-purple-900/40 disabled:opacity-50"
-                        >
-                          →
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
             </ScrollArea>
         </div>
 
