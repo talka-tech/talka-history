@@ -1,7 +1,6 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' });
   }
@@ -38,16 +37,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (messagesError) {
       console.error('❌ Erro ao deletar mensagens:', messagesError);
-      // Fallback: tentar delete simples
-      const { error: simpleMsgError } = await supabase
-        .from('messages')
-        .delete()
-        .in('conversation_id', 
-          supabase.from('conversations').select('id').eq('user_id', userId)
-        );
+      // Fallback: buscar IDs e deletar mensagens
+      const { data: userConversations, error: convFetchError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('user_id', userId);
       
-      if (simpleMsgError) {
-        throw new Error(`Erro ao deletar mensagens: ${simpleMsgError.message}`);
+      if (convFetchError) {
+        throw new Error(`Erro ao buscar conversas: ${convFetchError.message}`);
+      }
+
+      const conversationIds = userConversations?.map(c => c.id) || [];
+      
+      if (conversationIds.length > 0) {
+        const { error: simpleMsgError } = await supabase
+          .from('messages')
+          .delete()
+          .in('conversation_id', conversationIds);
+        
+        if (simpleMsgError) {
+          throw new Error(`Erro ao deletar mensagens: ${simpleMsgError.message}`);
+        }
       }
     }
 

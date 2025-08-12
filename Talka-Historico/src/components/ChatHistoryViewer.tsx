@@ -781,7 +781,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400/70 w-4 h-4" />
                     <Input
-                        placeholder="🔍 Digite o número: (71) 9644-0261 ou 71964402..."
+                        placeholder="🔍 Digite o número..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-black/60 border-purple-800/60 text-white placeholder:text-purple-400/60 focus:border-purple-600/80 backdrop-blur-sm"
