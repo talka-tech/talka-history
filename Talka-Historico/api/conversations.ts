@@ -28,56 +28,25 @@ export default async function handler(request: Request) {
         }
 
         console.log(`🚀 Carregando conversas: userId=${userId}, limit=${limit}`);
-        console.log(`🔍 DEBUGGING: Iniciando query no Supabase...`);
+        console.log(`🔍 DEBUGGING: Testando query direta com limite super alto...`);
         
-        // PRIMEIRA QUERY: Busca conversas com PAGINAÇÃO FORÇADA (contornar limite)
-        let allConversations: any[] = [];
-        let page = 0;
-        const pageSize = 1000;
-        let hasMore = true;
-        
-        console.log(`🔍 DEBUGGING: Iniciando busca paginada...`);
-        
-        while (hasMore && allConversations.length < 50000) {
-            const offset = page * pageSize;
-            console.log(`🔍 DEBUGGING: Buscando página ${page}, offset ${offset}, pageSize ${pageSize}`);
+        // TENTATIVA 1: Query direta com limite massivo
+        const { data: conversations, error: convError } = await supabase
+            .from('conversations')
+            .select('id, title, user_id, created_at')
+            .eq('user_id', parseInt(userId))
+            .order('created_at', { ascending: false })
+            .limit(100000); // LIMITE SUPER ALTO
             
-            const { data: pageConversations, error: pageError } = await supabase
-                .from('conversations')
-                .select('id, title, user_id, created_at')
-                .eq('user_id', parseInt(userId))
-                .order('created_at', { ascending: false })
-                .range(offset, offset + pageSize - 1); // Usando range ao invés de limit
-                
-            console.log(`🔍 DEBUGGING: Página ${page} retornou:`, pageConversations?.length || 0, 'conversas');
-            
-            if (pageError) {
-                console.error('❌ Erro ao buscar conversas página', page, ':', pageError);
-                throw pageError;
-            }
-            
-            if (!pageConversations || pageConversations.length === 0) {
-                console.log(`🔍 DEBUGGING: Página ${page} vazia, parando busca`);
-                hasMore = false;
-                break;
-            }
-            
-            allConversations.push(...pageConversations);
-            
-            // Se retornou menos que pageSize, é a última página
-            if (pageConversations.length < pageSize) {
-                console.log(`🔍 DEBUGGING: Página ${page} parcial (${pageConversations.length}), última página`);
-                hasMore = false;
-            }
-            
-            page++;
-            console.log(`🔍 DEBUGGING: Total acumulado: ${allConversations.length} conversas`);
-        }
-        
-        const conversations = allConversations;
-        console.log(`🔍 DEBUGGING: Query paginada finalizada!`);
-        console.log(`🔍 DEBUGGING: conversations =`, conversations.length, 'conversas');
+        console.log(`🔍 DEBUGGING: Query executada!`);
+        console.log(`🔍 DEBUGGING: conversations =`, conversations?.length || 0, 'conversas');
+        console.log(`🔍 DEBUGGING: convError =`, convError);
         console.log(`🔍 DEBUGGING: Tipo de conversations:`, typeof conversations, Array.isArray(conversations));
+        
+        if (convError) {
+            console.error('❌ Erro ao buscar conversas:', convError);
+            throw convError;
+        }
 
         if (!conversations || conversations.length === 0) {
             console.log('📭 Nenhuma conversa encontrada');
