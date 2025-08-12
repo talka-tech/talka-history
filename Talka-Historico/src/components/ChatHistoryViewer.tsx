@@ -151,7 +151,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       
       console.log('🗑️ Iniciando limpeza de dados para usuário:', currentUserId);
       
-      const response = await fetch('/api/clear-data-supabase', {
+      const response = await fetch('/api/clear-data-fk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
