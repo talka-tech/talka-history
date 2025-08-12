@@ -19,11 +19,35 @@ export default async function handler(request: Request) {
     try {
         const url = new URL(request.url);
         const userId = url.searchParams.get('userId');
-        const limit = parseInt(url.searchParams.get('limit') || '25000'); // Limite para 25k conversas (11.450 + margem)
+        const conversationId = url.searchParams.get('conversationId'); // NOVO: busca por ID específico
 
         if (!userId) {
             return new Response(JSON.stringify({ error: 'User ID is required' }), {
                 status: 400, headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // BUSCA POR ID DE CONVERSA ESPECÍFICA
+        if (conversationId) {
+            console.log(`🎯 Buscando conversa específica ID: ${conversationId} para usuário: ${userId}`);
+            
+            const { data: conversation, error: convError } = await supabase
+                .from('conversations')
+                .select('id, title, user_id, created_at')
+                .eq('user_id', parseInt(userId))
+                .eq('id', conversationId)
+                .single();
+                
+            if (convError) {
+                console.log(`❌ Conversa ID ${conversationId} não encontrada:`, convError);
+                return new Response(JSON.stringify([]), {
+                    status: 200, headers: { 'Content-Type': 'application/json' }
+                });
+            }
+            
+            console.log(`✅ Conversa ID ${conversationId} encontrada:`, conversation.title);
+            return new Response(JSON.stringify([conversation]), {
+                status: 200, headers: { 'Content-Type': 'application/json' }
             });
         }
 
