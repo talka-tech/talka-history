@@ -79,7 +79,8 @@ export class AutoCompressUploader {
     if (this.onProgress) this.onProgress(30, 'Processando mensagens...');
 
     const messagesToInsert: any[] = [];
-    const conversationIds = new Set();
+    const conversationIds = new Set(); // Só adiciona conversas que têm mensagens válidas
+    const conversationMessageCount = new Map(); // Track mensagens por conversa para debug
     let processedLines = 0;
     const totalLines = lines.length - 1; // Excluindo header
 
@@ -98,7 +99,12 @@ export class AutoCompressUploader {
 
       if (data.type !== 'text' || !data.text) continue;
 
+      // SÓ ADICIONA À CONVERSA QUANDO TEM MENSAGEM VÁLIDA
       conversationIds.add(data.chat_id);
+      
+      // Track para debug
+      const currentCount = conversationMessageCount.get(data.chat_id) || 0;
+      conversationMessageCount.set(data.chat_id, currentCount + 1);
       
       // Como o id é auto-increment (integer), não enviamos ele
       const senderName = data.fromMe === '1' ? 'Você' : this.getSenderName(data);
@@ -133,10 +139,15 @@ export class AutoCompressUploader {
     console.log(`📊 ESTATÍSTICAS DO PROCESSAMENTO:`);
     console.log(`   📄 Total de linhas: ${totalLines}`);
     console.log(`   📝 Mensagens válidas: ${messagesToInsert.length}`);
-    console.log(`   💬 Conversas únicas: ${conversationIds.size}`);
-    console.log(`   📱 Primeiros 5 chat_ids: ${Array.from(conversationIds).slice(0, 5).join(', ')}`);
+    console.log(`   💬 Conversas com mensagens válidas: ${conversationIds.size}`);
+    
+    // Top 10 conversas com mais mensagens
+    const sortedConversations = Array.from(conversationMessageCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+    console.log(`   📈 Top conversas: ${sortedConversations.map(([id, count]) => `${id}(${count})`).join(', ')}`);
 
-    if (this.onProgress) this.onProgress(70, `Criando ${conversationIds.size} conversas...`);
+    if (this.onProgress) this.onProgress(70, `Criando ${conversationIds.size} conversas válidas...`);
 
     // **PRIMEIRO: CRIAR CONVERSAS VAZIAS**
     await this.createConversations(Array.from(conversationIds) as string[], userId);
