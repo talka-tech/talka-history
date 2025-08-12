@@ -32,33 +32,83 @@ export default async function handler(request: Request) {
         console.log(`🔧 LOG DEBUG: timestamp=${new Date().toISOString()}`);
         console.log(`🎯 LOG IMPORTANTE: Esta API vai buscar entre TODAS as conversas (sem limite 1000)`);
         
-        // BUSCA DIRETA: Procura em TODAS as conversas do usuário
-        const { data: conversations, error: convError } = await supabase
+        // Normaliza o termo de busca removendo caracteres especiais
+        const normalizedSearchTerm = searchTerm.replace(/[^\d]/g, ''); // Remove tudo que não é dígito
+        console.log(`🔍 BUSCA NORMALIZADA: "${searchTerm}" → "${normalizedSearchTerm}"`);
+        
+        // BUSCA DUPLA: busca tanto no título original quanto em versão normalizada
+        let conversations: any[] = [];
+        
+        // 1. Busca no título original (para textos e números formatados)
+        const { data: titleResults, error: titleError } = await supabase
             .from('conversations')
             .select('id, title, user_id, created_at')
             .eq('user_id', parseInt(userId))
-            .ilike('title', `%${searchTerm}%`) // Busca case-insensitive no título
+            .ilike('title', `%${searchTerm}%`)
             .order('created_at', { ascending: false })
-            .limit(100); // Limita a 100 resultados da busca
+            .limit(100);
             
-        if (convError) {
-            console.error('❌ Erro na busca:', convError);
-            throw convError;
+        if (titleError) {
+            console.error('❌ Erro na busca por título:', titleError);
+            throw titleError;
         }
         
-        console.log(`✅ LOG SUPABASE BUSCA RETORNOU: ${conversations?.length || 0} conversas encontradas`);
+        conversations.push(...(titleResults || []));
+        console.log(`📋 BUSCA POR TÍTULO: ${titleResults?.length || 0} resultados`);
+        
+        // 2. Se é número, busca também normalizada (remove formatação)
+        if (normalizedSearchTerm.length >= 3) {
+            console.log(`🔢 BUSCA NUMÉRICA: Procurando números que contenham "${normalizedSearchTerm}"`);
+            
+            // Busca conversas cujo título, quando normalizado, contém o número
+            const { data: allConversations, error: allError } = await supabase
+                .from('conversations')
+                .select('id, title, user_id, created_at')
+                .eq('user_id', parseInt(userId))
+                .order('created_at', { ascending: false });
+                
+            if (allError) {
+                console.error('❌ Erro na busca completa:', allError);
+            } else {
+                // Filtra no código: encontra conversas cujo título normalizado contém o número
+                const numericMatches = (allConversations || []).filter(conv => {
+                    const normalizedTitle = conv.title.replace(/[^\d]/g, '');
+                    const matches = normalizedTitle.includes(normalizedSearchTerm);
+                    if (matches) {
+                        console.log(`✅ MATCH NUMÉRICO: "${conv.title}" → "${normalizedTitle}" contém "${normalizedSearchTerm}"`);
+                    }
+                    return matches;
+                });
+                
+                console.log(`🔢 BUSCA NUMÉRICA: ${numericMatches.length} resultados adicionais`);
+                
+                // Adiciona resultados únicos (evita duplicatas)
+                numericMatches.forEach(match => {
+                    if (!conversations.find(c => c.id === match.id)) {
+                        conversations.push(match);
+                    }
+                });
+            }
+        }
+        
+        // Remove duplicatas e limita resultados
+        const uniqueConversations = conversations
+            .filter((conv, index, self) => self.findIndex(c => c.id === conv.id) === index)
+            .slice(0, 100);
+            
+        console.log(`✅ LOG BUSCA FINAL: ${uniqueConversations.length} conversas únicas encontradas`);
 
-        if (!conversations || conversations.length === 0) {
-            console.log(`📭 Nenhuma conversa encontrada para: "${searchTerm}"`);
+        if (!uniqueConversations || uniqueConversations.length === 0) {
+            console.log(`📭 Nenhuma conversa encontrada para: "${searchTerm}" (nem título nem número)`);
             return new Response(JSON.stringify([]), {
                 status: 200, headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        console.log(`🎯 ${conversations.length} conversas encontradas para: "${searchTerm}"`);
+        console.log(`🎯 ${uniqueConversations.length} conversas encontradas para: "${searchTerm}"`);
 
         // Busca mensagens para as conversas encontradas
-        const conversationIds = conversations.map(c => c.id);
+        const conversationIds = uniqueConversations.map(c => c.id);
         const { data: messages, error: msgError } = await supabase
             .from('messages')
             .select('id, timestamp, sender, content, fromMe, conversation_id, created_at')
@@ -81,12 +131,12 @@ export default async function handler(request: Request) {
         });
 
         // Monta resultado final
-        const conversationsWithMessages = conversations.map(conv => ({
+        const conversationsWithMessages = uniqueConversations.map(conv => ({
             ...conv,
             messages: messagesByConv.get(conv.id) || []
         }));
 
-        console.log(`✅ BUSCA: ${conversations.length} conversas com ${messages?.length || 0} mensagens`);
+        console.log(`✅ BUSCA: ${uniqueConversations.length} conversas com ${messages?.length || 0} mensagens`);
 
         return new Response(JSON.stringify(conversationsWithMessages), {
             status: 200, headers: { 'Content-Type': 'application/json' }

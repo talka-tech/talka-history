@@ -1223,59 +1223,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     </div>
                     )}
                     
-                    {/* 📄 PAGINAÇÃO - Apenas para carregamento padrão */}
+                    {/* 📄 PAGINAÇÃO COMPACTA - Apenas para carregamento padrão */}
                     {!isFetching && !searchTerm.trim() && totalPages > 1 && (
-                    <div className="mx-2 mb-4 p-4 bg-black/40 border border-purple-800/30 rounded-lg">
-                        <div className="flex items-center justify-between text-purple-300 text-sm mb-3">
-                            <span>📄 Página {currentPage} de {totalPages}</span>
-                            <span className="text-xs text-purple-400/70">
-                                {((currentPage - 1) * conversationsPerPage) + 1}-{Math.min(currentPage * conversationsPerPage, filteredConversations.length)} de {filteredConversations.length}
-                            </span>
-                        </div>
+                    <div className="mx-2 mb-4 p-3 bg-black/40 border border-purple-800/30 rounded-lg">
                         
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-between gap-3">
                             <Button
                                 onClick={prevPage}
                                 disabled={!hasPrevPage}
                                 variant="outline"
                                 size="sm"
-                                className="text-purple-300 border-purple-700/40 hover:bg-purple-800/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-8 h-8 p-0 text-purple-300 border-purple-700/40 hover:bg-purple-800/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <ChevronLeft className="w-4 h-4 mr-1" />
-                                Anterior
+                                <ChevronLeft className="w-4 h-4" />
                             </Button>
                             
-                            {/* Números das páginas */}
-                            <div className="flex gap-1">
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    let pageNum;
-                                    if (totalPages <= 5) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage <= 3) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage >= totalPages - 2) {
-                                        pageNum = totalPages - 4 + i;
-                                    } else {
-                                        pageNum = currentPage - 2 + i;
-                                    }
-                                    
-                                    const isActive = pageNum === currentPage;
-                                    return (
-                                        <Button
-                                            key={pageNum}
-                                            onClick={() => goToPage(pageNum)}
-                                            variant={isActive ? "default" : "outline"}
-                                            size="sm"
-                                            className={`w-8 h-8 p-0 text-xs ${
-                                                isActive 
-                                                    ? 'bg-purple-600 text-white border-purple-500' 
-                                                    : 'text-purple-300 border-purple-700/40 hover:bg-purple-800/20'
-                                            }`}
-                                        >
-                                            {pageNum}
-                                        </Button>
-                                    );
-                                })}
+                            {/* Info central */}
+                            <div className="flex-1 text-center">
+                                <span className="text-xs text-purple-300 font-medium">Página {currentPage}/{totalPages}</span>
+                                <span className="block text-xs text-purple-400/70">
+                                    {((currentPage - 1) * conversationsPerPage) + 1}-{Math.min(currentPage * conversationsPerPage, filteredConversations.length)} de {filteredConversations.length}
+                                </span>
                             </div>
                             
                             <Button
@@ -1283,10 +1251,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 disabled={!hasNextPage}
                                 variant="outline"
                                 size="sm"
-                                className="text-purple-300 border-purple-700/40 hover:bg-purple-800/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-8 h-8 p-0 text-purple-300 border-purple-700/40 hover:bg-purple-800/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Próxima
-                                <ChevronRight className="w-4 h-4 ml-1" />
+                                <ChevronRight className="w-4 h-4" />
                             </Button>
                         </div>
                     </div>
