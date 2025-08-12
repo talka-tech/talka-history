@@ -88,6 +88,7 @@ export class AutoCompressUploader {
     const conversationIds = new Set(); // Só adiciona conversas que têm mensagens válidas
     const conversationMessageCount = new Map(); // Track mensagens por conversa para debug
     const conversationPhones = new Map(); // NOVO: Armazena o número de telefone de cada conversa
+    const conversationDates = new Map(); // NOVO: Armazena a data de criação de cada conversa do CSV
     let processedLines = 0;
     const totalLines = lines.length - 1; // Excluindo header
 
@@ -117,6 +118,11 @@ export class AutoCompressUploader {
         if (!conversationMessageCount.has(data.chat_id)) {
           console.log(`📞 NÚMERO CAPTURADO: Conversa ${data.chat_id} → ${data.mobile_number.trim()}`);
         }
+      }
+      
+      // NOVO: Armazena a data de criação da conversa do CSV
+      if (data.chat_created && data.chat_created.trim()) {
+        conversationDates.set(data.chat_id, data.chat_created.trim());
       }
       
       // Track para debug
@@ -168,8 +174,8 @@ export class AutoCompressUploader {
 
     if (this.onProgress) this.onProgress(70, `Criando ${conversationIds.size} conversas válidas...`);
 
-    // **CRIAR CONVERSAS COM TÍTULOS FORMATADOS**
-    await this.createConversations(Array.from(conversationIds) as string[], userId, conversationPhones);
+    // **CRIAR CONVERSAS COM TÍTULOS FORMATADOS E DATAS DO CSV**
+    await this.createConversations(Array.from(conversationIds) as string[], userId, conversationPhones, conversationDates);
 
     if (this.onProgress) this.onProgress(75, `Salvando ${messagesToInsert.length} mensagens no banco...`);
 
@@ -241,9 +247,9 @@ export class AutoCompressUploader {
     };
   }
 
-  async createConversations(conversationIds: string[], userId: number, conversationPhones?: Map<string, string>) {
+  async createConversations(conversationIds: string[], userId: number, conversationPhones?: Map<string, string>, conversationDates?: Map<string, string>) {
     // OTIMIZAÇÃO ULTRA-RÁPIDA: Uma única consulta para verificar conversas existentes
-    console.log(`📁 Criando ${conversationIds.length} conversas com números de telefone...`);
+    console.log(`📁 Criando ${conversationIds.length} conversas com números de telefone e datas do CSV...`);
     
     const convIds = conversationIds.map(id => parseInt(id));
     
@@ -261,18 +267,22 @@ export class AutoCompressUploader {
       .map(id => {
         const phoneNumber = conversationPhones?.get(id.toString());
         const title = phoneNumber ? this.formatPhoneNumber(phoneNumber) : `Conversa ${id}`;
+        const csvDate = conversationDates?.get(id.toString());
         
-        // 🔍 LOG: Processo de criação de título
+        // 🔍 LOG: Processo de criação de título e data
         console.log(`📋 CRIANDO CONVERSA: ID ${id}`, {
           phoneNumber: phoneNumber || 'N/A',
           title: title,
-          hasPhone: !!phoneNumber
+          csvDate: csvDate || 'N/A',
+          hasPhone: !!phoneNumber,
+          hasDate: !!csvDate
         });
         
         return {
           id,
           title,
-          user_id: userId
+          user_id: userId,
+          created_at: csvDate || new Date().toISOString() // Usa data do CSV ou fallback para agora
         };
       });
     
@@ -287,7 +297,7 @@ export class AutoCompressUploader {
       console.log(`🔍 PREVIEW DAS CONVERSAS QUE SERÃO INSERIDAS:`);
       const preview = newConversations.slice(0, 5);
       preview.forEach((conv, index) => {
-        console.log(`  ${index + 1}. ID: ${conv.id} | Título: "${conv.title}" | User: ${conv.user_id}`);
+        console.log(`  ${index + 1}. ID: ${conv.id} | Título: "${conv.title}" | Data: ${conv.created_at} | User: ${conv.user_id}`);
       });
       if (newConversations.length > 5) {
         console.log(`  ... e mais ${newConversations.length - 5} conversas`);
@@ -303,7 +313,7 @@ export class AutoCompressUploader {
         const { error, data } = await supabase
           .from('conversations')
           .insert(batch)
-          .select('id, title'); // Retorna o que foi inserido
+          .select('id, title, created_at'); // Retorna o que foi inserido
         
         if (error) {
           console.error(`❌ Erro ao criar lote de conversas:`, error);
@@ -312,12 +322,12 @@ export class AutoCompressUploader {
         
         console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${batch.length} conversas inseridas no banco`);
         
-        // Log das conversas inseridas para verificar se os títulos estão corretos
+        // Log das conversas inseridas para verificar se os títulos e datas estão corretos
         if (data && data.length > 0) {
           console.log(`🔍 VERIFICAÇÃO DO QUE FOI INSERIDO NO BANCO:`);
           const firstThree = data.slice(0, 3);
           firstThree.forEach(conv => {
-            console.log(`   ✅ ID ${conv.id}: "${conv.title}"`);
+            console.log(`   ✅ ID ${conv.id}: "${conv.title}" | Data: ${conv.created_at}`);
           });
         } else {
           console.log(`⚠️ Dados inseridos não retornados pelo Supabase`);
