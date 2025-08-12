@@ -64,16 +64,22 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const [currentPage, setCurrentPage] = useState(1);
+  // 📅 Estados para filtro de data
+  const [dateFilter, setDateFilter] = useState({
+    startDate: '',
+    endDate: '',
+    enabled: false
+  });
   
   // Sistema SEM paginação - foco na busca por número específico
   const conversationsPerPage = useMemo(() => {
-    // Se tem termo de busca, mostra TODOS os resultados (foco na busca)
-    if (searchTerm.trim()) {
-      return 999999; // Sem limite quando busca
+    // Se tem termo de busca OU filtro de data ativo, mostra TODOS os resultados
+    if (searchTerm.trim() || dateFilter.enabled) {
+      return 999999; // Sem limite quando tem filtros
     }
     // Se não tem busca, mostra apenas os primeiros 50 para performance inicial
     return 50;
-  }, [searchTerm]);
+  }, [searchTerm, dateFilter.enabled]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,7 +106,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     try {
         console.log(`🚀 Carregando todas as conversas para visualização...`);
         
-        const response = await fetch(`/api/conversations?userId=${currentUserId}&limit=15000&_=${Date.now()}`);
+        const response = await fetch(`/api/conversations?userId=${currentUserId}&limit=25000&_=${Date.now()}`);
         
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${response.statusText}`);
@@ -569,13 +575,73 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     return phone.replace(/[^\d]/g, ''); // Remove tudo que não é dígito
   }, []);
 
+  // 📅 Funções para presets de data rápidos
+  const setDatePreset = useCallback((preset: 'today' | 'week' | 'month' | 'year') => {
+    const today = new Date();
+    const startDate = new Date();
+    
+    switch (preset) {
+      case 'today':
+        break; // startDate já é hoje
+      case 'week':
+        startDate.setDate(today.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(today.getMonth() - 1);
+        break;
+      case 'year':
+        startDate.setFullYear(today.getFullYear() - 1);
+        break;
+    }
+    
+    setDateFilter({
+      enabled: true,
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    });
+  }, []);
+
   const filteredConversations = useMemo(() => {
-    if (!searchTerm.trim()) return conversations;
+    let filtered = conversations;
+    
+    // 📅 FILTRO POR DATA primeiro
+    if (dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate)) {
+      filtered = filtered.filter(conv => {
+        if (!conv.created_at) return false;
+        
+        const convDate = new Date(conv.created_at);
+        const startDate = dateFilter.startDate ? new Date(dateFilter.startDate) : null;
+        const endDate = dateFilter.endDate ? new Date(dateFilter.endDate) : null;
+        
+        // Se só tem data início
+        if (startDate && !endDate) {
+          return convDate >= startDate;
+        }
+        
+        // Se só tem data fim
+        if (!startDate && endDate) {
+          // Ajusta para fim do dia
+          endDate.setHours(23, 59, 59, 999);
+          return convDate <= endDate;
+        }
+        
+        // Se tem ambas as datas
+        if (startDate && endDate) {
+          endDate.setHours(23, 59, 59, 999);
+          return convDate >= startDate && convDate <= endDate;
+        }
+        
+        return true;
+      });
+    }
+    
+    // 🔍 FILTRO POR BUSCA depois
+    if (!searchTerm.trim()) return filtered;
     
     const searchTermLower = searchTerm.toLowerCase();
     const searchTermNumbers = normalizePhoneNumber(searchTerm);
     
-    return conversations.filter(conv => {
+    return filtered.filter(conv => {
       if (!conv) return false;
       
       // 🎯 PRIORIDADE: Busca por número de telefone (mais eficiente)
@@ -606,7 +672,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       
       return titleMatch || participantsMatch || messagesMatch;
     });
-  }, [conversations, searchTerm, normalizePhoneNumber]);
+  }, [conversations, searchTerm, dateFilter, normalizePhoneNumber]);
 
   // Paginação com carregamento lazy
   const totalPages = Math.ceil(filteredConversations.length / conversationsPerPage);
@@ -617,7 +683,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   // Reset página quando filtro muda ou quando carrega novas conversas
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, conversations.length]);
+  }, [searchTerm, dateFilter, conversations.length]);
 
   const formatTimestamp = useCallback((timestamp: string) => {
     if (!timestamp || timestamp === 'Invalid Date') return '';
@@ -729,8 +795,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                             </h2>
                             <p className="text-purple-300/70 text-sm">
                                 {conversations.length} conversas disponíveis
-                                {searchTerm && ` • ${filteredConversations.length} filtradas`}
-                                {totalPages > 1 && ` • ${conversationsPerPage}/página`}
+                                {searchTerm && ` • ${filteredConversations.length} por busca`}
+                                {dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate) && 
+                                  ` • ${filteredConversations.length} no período`
+                                }
+                                {totalPages > 1 && !searchTerm && !dateFilter.enabled && ` • ${conversationsPerPage}/página`}
                             </p>
                         </div>
                     </div>
@@ -762,16 +831,107 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             {showSettings && (
               <div className="p-4 border-b border-purple-900/40 bg-black/40">
                 <h3 className="text-white font-medium mb-3 text-sm">⚙️ Configurações</h3>
-                <div className="space-y-2">
-                  <Button
-                    onClick={() => setShowDeleteModal(true)}
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-red-400 border-red-600/60 hover:bg-red-500/20 hover:text-red-300"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Apagar Todas as Conversas
-                  </Button>
+                <div className="space-y-3">
+                  {/* Filtro de Data */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="dateFilter"
+                        checked={dateFilter.enabled}
+                        onChange={(e) => setDateFilter(prev => ({ ...prev, enabled: e.target.checked }))}
+                        className="w-4 h-4 text-purple-600 bg-black/60 border-purple-700 rounded focus:ring-purple-500"
+                      />
+                      <label htmlFor="dateFilter" className="text-sm text-purple-300">
+                        📅 Filtrar por Data
+                      </label>
+                    </div>
+                    
+                    {dateFilter.enabled && (
+                      <div className="ml-6 space-y-2">
+                        <div>
+                          <label className="text-xs text-purple-400/70 block mb-1">Data Início:</label>
+                          <input
+                            type="date"
+                            value={dateFilter.startDate}
+                            onChange={(e) => setDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
+                            className="w-full px-2 py-1 text-xs bg-black/60 border border-purple-800/60 rounded text-white focus:border-purple-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-purple-400/70 block mb-1">Data Fim:</label>
+                          <input
+                            type="date"
+                            value={dateFilter.endDate}
+                            onChange={(e) => setDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
+                            className="w-full px-2 py-1 text-xs bg-black/60 border border-purple-800/60 rounded text-white focus:border-purple-600"
+                          />
+                        </div>
+                        
+                        {(dateFilter.startDate || dateFilter.endDate) && (
+                          <Button
+                            onClick={() => setDateFilter(prev => ({ ...prev, startDate: '', endDate: '' }))}
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-purple-400 border-purple-700/40 hover:bg-purple-800/20 text-xs"
+                          >
+                            🗑️ Limpar Datas
+                          </Button>
+                        )}
+                        
+                        {/* Presets rápidos */}
+                        <div className="mt-2">
+                          <label className="text-xs text-purple-400/70 block mb-1">⚡ Períodos Rápidos:</label>
+                          <div className="grid grid-cols-2 gap-1">
+                            <Button
+                              onClick={() => setDatePreset('today')}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                            >
+                              Hoje
+                            </Button>
+                            <Button
+                              onClick={() => setDatePreset('week')}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                            >
+                              7 dias
+                            </Button>
+                            <Button
+                              onClick={() => setDatePreset('month')}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                            >
+                              30 dias
+                            </Button>
+                            <Button
+                              onClick={() => setDatePreset('year')}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                            >
+                              1 ano
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="border-t border-purple-800/30 pt-2">
+                    <Button
+                      onClick={() => setShowDeleteModal(true)}
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-red-400 border-red-600/60 hover:bg-red-500/20 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Apagar Todas as Conversas
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -781,7 +941,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400/70 w-4 h-4" />
                     <Input
-                        placeholder="🔍 Digite o número..."
+                        placeholder="Digite o número..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-black/60 border-purple-800/60 text-white placeholder:text-purple-400/60 focus:border-purple-600/80 backdrop-blur-sm"
@@ -894,14 +1054,16 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     )}
                 </div>
                 
-                {/* Paginação - só aparece sem busca ativa */}
-                {totalPages > 1 && !searchTerm.trim() && (
+                {/* Paginação - só aparece sem busca ativa nem filtro de data */}
+                {totalPages > 1 && !searchTerm.trim() && !dateFilter.enabled && (
                   <div className="p-4 border-t border-purple-900/40">
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-purple-300/70">
                         {searchTerm.trim() 
-                          ? `🔍 ${filteredConversations.length} resultado(s) encontrado(s)` 
-                          : `Página ${currentPage} de ${totalPages} • ${conversations.length} conversas carregadas`
+                          ? `🔍 ${filteredConversations.length} resultado(s) por busca` 
+                          : dateFilter.enabled && (dateFilter.startDate || dateFilter.endDate)
+                            ? `📅 ${filteredConversations.length} conversa(s) no período`
+                            : `Página ${currentPage} de ${totalPages} • ${conversations.length} conversas carregadas`
                         }
                       </p>
                       <div className="flex items-center gap-2">

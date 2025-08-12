@@ -19,7 +19,7 @@ export default async function handler(request: Request) {
     try {
         const url = new URL(request.url);
         const userId = url.searchParams.get('userId');
-        const limit = parseInt(url.searchParams.get('limit') || '15000'); // Limite aumentado para suportar grandes volumes
+        const limit = parseInt(url.searchParams.get('limit') || '25000'); // Limite para 25k conversas (11.450 + margem)
 
         if (!userId) {
             return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -35,7 +35,7 @@ export default async function handler(request: Request) {
             .select('id, title, user_id, created_at')
             .eq('user_id', parseInt(userId))
             .order('created_at', { ascending: false })
-            .limit(Math.max(limit, 20000)); // Força pelo menos 20.000
+            .limit(Math.max(limit, 25000)); // Força pelo menos 25.000 para suas 11.450 conversas
 
         if (convError) {
             console.error('❌ Erro ao buscar conversas:', convError);
