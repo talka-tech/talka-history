@@ -70,6 +70,12 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     endDate: '',
     enabled: false
   });
+  // 📅 Estados temporários para o painel (antes de aplicar)
+  const [tempDateFilter, setTempDateFilter] = useState({
+    startDate: '',
+    endDate: '',
+    enabled: false
+  });
   
   // Sistema SEM paginação - foco na busca por número específico
   const conversationsPerPage = useMemo(() => {
@@ -106,7 +112,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     try {
         console.log(`🚀 Carregando todas as conversas para visualização...`);
         
-        const response = await fetch(`/api/conversations?userId=${currentUserId}&limit=25000&_=${Date.now()}`);
+        const response = await fetch(`/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
         
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${response.statusText}`);
@@ -575,7 +581,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     return phone.replace(/[^\d]/g, ''); // Remove tudo que não é dígito
   }, []);
 
-  // 📅 Funções para presets de data rápidos
+  // 📅 Funções para presets de data rápidos (estado temporário)
   const setDatePreset = useCallback((preset: 'today' | 'week' | 'month' | 'year') => {
     const today = new Date();
     const startDate = new Date();
@@ -594,11 +600,24 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         break;
     }
     
-    setDateFilter({
+    setTempDateFilter({
       enabled: true,
       startDate: startDate.toISOString().split('T')[0],
       endDate: today.toISOString().split('T')[0]
     });
+  }, []);
+
+  // 📅 Função para aplicar filtro e fechar painel
+  const applyDateFilter = useCallback(() => {
+    setDateFilter(tempDateFilter);
+    setShowSettings(false); // Fecha o painel
+  }, [tempDateFilter]);
+
+  // 📅 Função para limpar filtro
+  const clearDateFilter = useCallback(() => {
+    const clearedFilter = { startDate: '', endDate: '', enabled: false };
+    setTempDateFilter(clearedFilter);
+    setDateFilter(clearedFilter);
   }, []);
 
   const filteredConversations = useMemo(() => {
@@ -765,7 +784,10 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     </div>
                     <div className="flex items-center gap-2">
                         <Button
-                            onClick={() => setShowSettings(!showSettings)}
+                            onClick={() => {
+                              setTempDateFilter(dateFilter); // Sincroniza estado atual
+                              setShowSettings(!showSettings);
+                            }}
                             variant="ghost"
                             size="sm"
                             className="text-purple-300/80 hover:bg-purple-900/40 hover:text-purple-200 border border-purple-800/50 hover:border-purple-700/60"
@@ -829,104 +851,140 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
 
             {/* Settings Panel */}
             {showSettings && (
-              <div className="p-4 border-b border-purple-900/40 bg-black/40">
-                <h3 className="text-white font-medium mb-3 text-sm">⚙️ Configurações</h3>
-                <div className="space-y-3">
-                  {/* Filtro de Data */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
+              <div className="p-4 border-b border-purple-900/40 bg-gradient-to-b from-black/60 to-purple-950/40 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                    ⚙️ Filtros & Configurações
+                  </h3>
+                  <Button
+                    onClick={() => setShowSettings(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-purple-400/70 hover:text-purple-300 w-6 h-6 p-0"
+                  >
+                    ✕
+                  </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  {/* Filtro de Data - Interface Melhorada */}
+                  <div className="bg-black/30 rounded-lg p-4 border border-purple-800/30">
+                    <div className="flex items-center gap-3 mb-3">
                       <input
                         type="checkbox"
                         id="dateFilter"
-                        checked={dateFilter.enabled}
-                        onChange={(e) => setDateFilter(prev => ({ ...prev, enabled: e.target.checked }))}
+                        checked={tempDateFilter.enabled}
+                        onChange={(e) => setTempDateFilter(prev => ({ ...prev, enabled: e.target.checked }))}
                         className="w-4 h-4 text-purple-600 bg-black/60 border-purple-700 rounded focus:ring-purple-500"
                       />
-                      <label htmlFor="dateFilter" className="text-sm text-purple-300">
-                        📅 Filtrar por Data
+                      <label htmlFor="dateFilter" className="text-sm font-medium text-white flex items-center gap-2">
+                        📅 Filtrar por Período
                       </label>
+                      {dateFilter.enabled && (
+                        <Badge variant="outline" className="text-xs border-green-600/60 text-green-400">
+                          Ativo
+                        </Badge>
+                      )}
                     </div>
                     
-                    {dateFilter.enabled && (
-                      <div className="ml-6 space-y-2">
-                        <div>
-                          <label className="text-xs text-purple-400/70 block mb-1">Data Início:</label>
-                          <input
-                            type="date"
-                            value={dateFilter.startDate}
-                            onChange={(e) => setDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
-                            className="w-full px-2 py-1 text-xs bg-black/60 border border-purple-800/60 rounded text-white focus:border-purple-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-purple-400/70 block mb-1">Data Fim:</label>
-                          <input
-                            type="date"
-                            value={dateFilter.endDate}
-                            onChange={(e) => setDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
-                            className="w-full px-2 py-1 text-xs bg-black/60 border border-purple-800/60 rounded text-white focus:border-purple-600"
-                          />
+                    {tempDateFilter.enabled && (
+                      <div className="space-y-3">
+                        {/* Inputs de Data */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-purple-300/80 block mb-1 font-medium">📅 Data Início</label>
+                            <input
+                              type="date"
+                              value={tempDateFilter.startDate}
+                              onChange={(e) => setTempDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm bg-black/60 border border-purple-700/60 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-purple-300/80 block mb-1 font-medium">📅 Data Fim</label>
+                            <input
+                              type="date"
+                              value={tempDateFilter.endDate}
+                              onChange={(e) => setTempDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm bg-black/60 border border-purple-700/60 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                            />
+                          </div>
                         </div>
                         
-                        {(dateFilter.startDate || dateFilter.endDate) && (
-                          <Button
-                            onClick={() => setDateFilter(prev => ({ ...prev, startDate: '', endDate: '' }))}
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-purple-400 border-purple-700/40 hover:bg-purple-800/20 text-xs"
-                          >
-                            🗑️ Limpar Datas
-                          </Button>
-                        )}
-                        
-                        {/* Presets rápidos */}
-                        <div className="mt-2">
-                          <label className="text-xs text-purple-400/70 block mb-1">⚡ Períodos Rápidos:</label>
-                          <div className="grid grid-cols-2 gap-1">
+                        {/* Presets Rápidos - Visual Melhorado */}
+                        <div>
+                          <label className="text-xs text-purple-300/80 block mb-2 font-medium">⚡ Períodos Rápidos</label>
+                          <div className="grid grid-cols-2 gap-2">
                             <Button
                               onClick={() => setDatePreset('today')}
                               variant="outline"
                               size="sm"
-                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                              className="text-xs text-white bg-purple-900/30 border-purple-600/50 hover:bg-purple-800/40 hover:border-purple-500 transition-all"
                             >
-                              Hoje
+                              📅 Hoje
                             </Button>
                             <Button
                               onClick={() => setDatePreset('week')}
                               variant="outline"
                               size="sm"
-                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                              className="text-xs text-white bg-purple-900/30 border-purple-600/50 hover:bg-purple-800/40 hover:border-purple-500 transition-all"
                             >
-                              7 dias
+                              📅 7 dias
                             </Button>
                             <Button
                               onClick={() => setDatePreset('month')}
                               variant="outline"
                               size="sm"
-                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                              className="text-xs text-white bg-purple-900/30 border-purple-600/50 hover:bg-purple-800/40 hover:border-purple-500 transition-all"
                             >
-                              30 dias
+                              📅 30 dias
                             </Button>
                             <Button
                               onClick={() => setDatePreset('year')}
                               variant="outline"
                               size="sm"
-                              className="text-xs text-purple-400 border-purple-700/40 hover:bg-purple-800/20 py-1"
+                              className="text-xs text-white bg-purple-900/30 border-purple-600/50 hover:bg-purple-800/40 hover:border-purple-500 transition-all"
                             >
-                              1 ano
+                              📅 1 ano
                             </Button>
                           </div>
+                        </div>
+                        
+                        {/* Botões de Ação - Destaque */}
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            onClick={applyDateFilter}
+                            className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white border-green-500/30 font-medium"
+                            size="sm"
+                          >
+                            ✅ Aplicar Filtro
+                          </Button>
+                          <Button
+                            onClick={clearDateFilter}
+                            variant="outline"
+                            size="sm"
+                            className="text-purple-400 border-purple-700/40 hover:bg-purple-800/20"
+                          >
+                            🗑️ Limpar
+                          </Button>
                         </div>
                       </div>
                     )}
                   </div>
                   
-                  <div className="border-t border-purple-800/30 pt-2">
+                  {/* Seção de Danger Zone */}
+                  <div className="bg-red-900/20 rounded-lg p-4 border border-red-800/30">
+                    <h4 className="text-red-300 font-medium text-sm mb-2 flex items-center gap-2">
+                      ⚠️ Zona de Perigo
+                    </h4>
                     <Button
-                      onClick={() => setShowDeleteModal(true)}
+                      onClick={() => {
+                        setShowDeleteModal(true);
+                        setShowSettings(false);
+                      }}
                       variant="outline"
                       size="sm"
-                      className="w-full text-red-400 border-red-600/60 hover:bg-red-500/20 hover:text-red-300"
+                      className="w-full text-red-400 border-red-600/60 hover:bg-red-500/20 hover:text-red-300 transition-colors"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Apagar Todas as Conversas
