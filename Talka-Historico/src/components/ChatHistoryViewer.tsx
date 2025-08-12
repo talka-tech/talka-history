@@ -106,14 +106,27 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     
     try {
         console.log(`🚀 Carregando todas as conversas para visualização...`);
+        console.log(`🔍 DEBUGGING FRONTEND: userId=${currentUserId}`);
+        console.log(`🔍 DEBUGGING FRONTEND: URL sendo chamada:`, `/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
         
         const response = await fetch(`/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
+        
+        console.log(`🔍 DEBUGGING FRONTEND: response.ok =`, response.ok);
+        console.log(`🔍 DEBUGGING FRONTEND: response.status =`, response.status);
+        console.log(`🔍 DEBUGGING FRONTEND: response.headers =`, Object.fromEntries(response.headers.entries()));
         
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
         
+        console.log(`🔍 DEBUGGING FRONTEND: Iniciando response.json()...`);
         const allConversations = await response.json();
+        console.log(`🔍 DEBUGGING FRONTEND: response.json() concluído!`);
+        console.log(`🔍 DEBUGGING FRONTEND: allConversations =`, allConversations);
+        console.log(`🔍 DEBUGGING FRONTEND: typeof allConversations =`, typeof allConversations);
+        console.log(`🔍 DEBUGGING FRONTEND: Array.isArray(allConversations) =`, Array.isArray(allConversations));
+        console.log(`🔍 DEBUGGING FRONTEND: allConversations.length =`, allConversations?.length);
+        
         console.log(`✅ ${allConversations.length} conversas carregadas para visualização`);
         
         // 🔍 LOG DETALHADO: Analisa as primeiras 3 conversas recebidas

@@ -28,6 +28,7 @@ export default async function handler(request: Request) {
         }
 
         console.log(`🚀 Carregando conversas: userId=${userId}, limit=${limit}`);
+        console.log(`🔍 DEBUGGING: Iniciando query no Supabase...`);
         
         // PRIMEIRA QUERY: Busca conversas (otimizado) - LIMITE EXPLICITO ALTO!
         const { data: conversations, error: convError } = await supabase
@@ -37,6 +38,12 @@ export default async function handler(request: Request) {
             .order('created_at', { ascending: false })
             .limit(50000); // LIMITE EXPLÍCITO ALTO para garantir todas as conversas
 
+        console.log(`🔍 DEBUGGING: Query executada!`);
+        console.log(`🔍 DEBUGGING: conversations =`, conversations);
+        console.log(`🔍 DEBUGGING: convError =`, convError);
+        console.log(`🔍 DEBUGGING: conversations.length =`, conversations?.length);
+        console.log(`🔍 DEBUGGING: Tipo de conversations:`, typeof conversations, Array.isArray(conversations));
+        
         if (convError) {
             console.error('❌ Erro ao buscar conversas:', convError);
             throw convError;
@@ -44,12 +51,14 @@ export default async function handler(request: Request) {
 
         if (!conversations || conversations.length === 0) {
             console.log('📭 Nenhuma conversa encontrada');
+            console.log(`🔍 DEBUGGING: conversations é null/undefined:`, conversations === null, conversations === undefined);
             return new Response(JSON.stringify([]), {
                 status: 200, headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        console.log(`📊 CONVERSAS RETORNADAS: ${conversations.length} de ${userId}`);
+        console.log(`📊 CONVERSAS RETORNADAS DO SUPABASE: ${conversations.length} de ${userId}`);
+        console.log(`🔍 DEBUGGING: Primeiras 3 conversas:`, conversations.slice(0, 3));
         
         // 🔍 LOG: Análise dos títulos das conversas retornadas do banco
         console.log(`🔍 TÍTULOS DAS CONVERSAS RETORNADAS DO BANCO:`);
@@ -93,6 +102,10 @@ export default async function handler(request: Request) {
         }));
 
         console.log(`✅ API: ${conversations.length} conversas com ${messages?.length || 0} mensagens carregadas!`);
+        console.log(`🔍 DEBUGGING: conversationsWithMessages.length =`, conversationsWithMessages.length);
+        console.log(`🔍 DEBUGGING: Tipo de conversationsWithMessages:`, typeof conversationsWithMessages, Array.isArray(conversationsWithMessages));
+        console.log(`🔍 DEBUGGING: Primeiras 3 conversationsWithMessages:`, conversationsWithMessages.slice(0, 3));
+        console.log(`🔍 DEBUGGING: JSON.stringify().length =`, JSON.stringify(conversationsWithMessages).length);
 
         return new Response(JSON.stringify(conversationsWithMessages), {
             status: 200, headers: { 'Content-Type': 'application/json' }
