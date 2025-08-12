@@ -59,36 +59,72 @@ export default async function handler(request: Request) {
         // 2. Se é número, busca também normalizada (remove formatação)
         if (normalizedSearchTerm.length >= 3) {
             console.log(`🔢 BUSCA NUMÉRICA: Procurando números que contenham "${normalizedSearchTerm}"`);
+            console.log(`🎯 BUSCA NUMÉRICA: SEM LIMITE - buscando entre TODAS as conversas do usuário`);
             
-            // Busca conversas cujo título, quando normalizado, contém o número
-            const { data: allConversations, error: allError } = await supabase
-                .from('conversations')
-                .select('id, title, user_id, created_at')
-                .eq('user_id', parseInt(userId))
-                .order('created_at', { ascending: false });
+            // BUSCA SEM LIMITE: pega TODAS as conversas para busca numérica
+            let allConversations: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+            
+            console.log(`📊 BUSCA NUMÉRICA: Sistema de paginação para buscar TODAS as conversas...`);
+            
+            while (hasMore && page < 50) { // Máximo 50 páginas = 50k conversas
+                const startIndex = page * pageSize;
+                const endIndex = startIndex + pageSize - 1;
                 
-            if (allError) {
-                console.error('❌ Erro na busca completa:', allError);
-            } else {
-                // Filtra no código: encontra conversas cujo título normalizado contém o número
-                const numericMatches = (allConversations || []).filter(conv => {
-                    const normalizedTitle = conv.title.replace(/[^\d]/g, '');
-                    const matches = normalizedTitle.includes(normalizedSearchTerm);
-                    if (matches) {
-                        console.log(`✅ MATCH NUMÉRICO: "${conv.title}" → "${normalizedTitle}" contém "${normalizedSearchTerm}"`);
-                    }
-                    return matches;
-                });
+                console.log(`🔄 BUSCA NUMÉRICA Página ${page + 1}: buscando registros ${startIndex}-${endIndex}...`);
                 
-                console.log(`🔢 BUSCA NUMÉRICA: ${numericMatches.length} resultados adicionais`);
+                const { data: pageData, error: pageError } = await supabase
+                    .from('conversations')
+                    .select('id, title, user_id, created_at')
+                    .eq('user_id', parseInt(userId))
+                    .order('created_at', { ascending: false })
+                    .range(startIndex, endIndex);
+                    
+                if (pageError) {
+                    console.error(`❌ BUSCA NUMÉRICA Erro na página ${page + 1}:`, pageError);
+                    break;
+                }
                 
-                // Adiciona resultados únicos (evita duplicatas)
-                numericMatches.forEach(match => {
-                    if (!conversations.find(c => c.id === match.id)) {
-                        conversations.push(match);
-                    }
-                });
+                if (!pageData || pageData.length === 0) {
+                    console.log(`✅ BUSCA NUMÉRICA Fim dos dados na página ${page + 1}`);
+                    hasMore = false;
+                    break;
+                }
+                
+                allConversations.push(...pageData);
+                console.log(`📈 BUSCA NUMÉRICA Página ${page + 1}: +${pageData.length} conversas | Total acumulado: ${allConversations.length}`);
+                
+                // Se retornou menos que 1000, é a última página
+                if (pageData.length < pageSize) {
+                    console.log(`✅ BUSCA NUMÉRICA Última página: ${pageData.length} < ${pageSize}`);
+                    hasMore = false;
+                }
+                
+                page++;
             }
+            
+            console.log(`🎉 BUSCA NUMÉRICA COMPLETA: ${allConversations.length} conversas carregadas para filtrar!`);
+            
+            // Filtra no código: encontra conversas cujo título normalizado contém o número
+            const numericMatches = allConversations.filter(conv => {
+                const normalizedTitle = conv.title.replace(/[^\d]/g, '');
+                const matches = normalizedTitle.includes(normalizedSearchTerm);
+                if (matches) {
+                    console.log(`✅ MATCH NUMÉRICO: "${conv.title}" → "${normalizedTitle}" contém "${normalizedSearchTerm}"`);
+                }
+                return matches;
+            });
+            
+            console.log(`🔢 BUSCA NUMÉRICA: ${numericMatches.length} resultados adicionais`);
+            
+            // Adiciona resultados únicos (evita duplicatas)
+            numericMatches.forEach(match => {
+                if (!conversations.find(c => c.id === match.id)) {
+                    conversations.push(match);
+                }
+            });
         }
         
         // Remove duplicatas e limita resultados
