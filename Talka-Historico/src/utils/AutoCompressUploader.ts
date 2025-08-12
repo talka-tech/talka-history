@@ -101,9 +101,11 @@ export class AutoCompressUploader {
       conversationIds.add(data.chat_id);
       
       // Como o id é auto-increment (integer), não enviamos ele
+      const senderName = data.fromMe === '1' ? 'Você' : this.getSenderName(data);
+      
       messagesToInsert.push({
         conversation_id: parseInt(data.chat_id), // Converte para int4
-        sender: data.fromMe === '1' ? 'Você' : (data.mobile_number || 'Desconhecido'),
+        sender: senderName,
         content: data.text,
         timestamp: data.message_created || new Date().toISOString(),
         fromMe: data.fromMe === '1'
@@ -127,6 +129,12 @@ export class AutoCompressUploader {
         await new Promise(resolve => setTimeout(resolve, 5));
       }
     }
+
+    console.log(`📊 ESTATÍSTICAS DO PROCESSAMENTO:`);
+    console.log(`   📄 Total de linhas: ${totalLines}`);
+    console.log(`   📝 Mensagens válidas: ${messagesToInsert.length}`);
+    console.log(`   💬 Conversas únicas: ${conversationIds.size}`);
+    console.log(`   📱 Primeiros 5 chat_ids: ${Array.from(conversationIds).slice(0, 5).join(', ')}`);
 
     if (this.onProgress) this.onProgress(70, `Criando ${conversationIds.size} conversas...`);
 
@@ -324,10 +332,40 @@ export class AutoCompressUploader {
   }
 
   generateConversationTitle(lastMessage: any): string {
+    // Se for mensagem enviada por mim, usa o número do contato ou ID da conversa
     if (lastMessage.fromMe) {
+      // Se temos o número do contato na conversa, vamos buscar na primeira mensagem não enviada por mim
       return `Conversa ${lastMessage.conversation_id}`;
     }
-    return lastMessage.sender || `Conversa ${lastMessage.conversation_id}`;
+    
+    // Se for mensagem recebida, usa o sender (que já tem o número formatado)
+    const sender = lastMessage.sender || `Conversa ${lastMessage.conversation_id}`;
+    
+    // Se o sender é um número completo (+55...), formata melhor
+    if (sender.startsWith('+55') && sender.length > 10) {
+      // Extrai apenas os últimos 9 dígitos para display mais limpo
+      const cleaned = sender.replace('+55', '');
+      if (cleaned.length >= 11) {
+        // Formato: (XX) 9XXXX-XXXX
+        return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 3)}${cleaned.substring(3, 7)}-${cleaned.substring(7)}`;
+      } else if (cleaned.length === 10) {
+        // Formato: (XX) XXXX-XXXX
+        return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6)}`;
+      }
+    }
+    
+    return sender;
+  }
+
+  getSenderName(data: any): string {
+    // Se tem mobile_number, usa ele
+    if (data.mobile_number && data.mobile_number.trim()) {
+      return data.mobile_number.trim();
+    }
+    
+    // Se não tem mobile_number, pode ser uma conversa sem número salvo
+    // Neste caso, usa o chat_id como fallback formatado
+    return `Contato ${data.chat_id}`;
   }
 
   parseCSVLine(line: string): string[] {
