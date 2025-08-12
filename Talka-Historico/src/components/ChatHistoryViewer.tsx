@@ -65,14 +65,15 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Sistema de paginação adaptativo baseado no número total de conversas
+  // Sistema SEM paginação - foco na busca por número específico
   const conversationsPerPage = useMemo(() => {
-    const total = conversations.length;
-    if (total <= 100) return total; // Mostra todas se ≤ 100
-    if (total <= 1000) return 50;   // 50 por página para 100-1000
-    if (total <= 5000) return 100;  // 100 por página para 1000-5000
-    return 200; // 200 por página para > 5000 conversas
-  }, [conversations.length]);
+    // Se tem termo de busca, mostra TODOS os resultados (foco na busca)
+    if (searchTerm.trim()) {
+      return 999999; // Sem limite quando busca
+    }
+    // Se não tem busca, mostra apenas os primeiros 50 para performance inicial
+    return 50;
+  }, [searchTerm]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -568,30 +569,44 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     return phone.replace(/[^\d]/g, ''); // Remove tudo que não é dígito
   }, []);
 
-  const filteredConversations = useMemo(() => 
-    conversations.filter(conv => {
+  const filteredConversations = useMemo(() => {
+    if (!searchTerm.trim()) return conversations;
+    
+    const searchTermLower = searchTerm.toLowerCase();
+    const searchTermNumbers = normalizePhoneNumber(searchTerm);
+    
+    return conversations.filter(conv => {
       if (!conv) return false;
       
-      const searchTermLower = searchTerm.toLowerCase();
-      const searchTermNumbers = normalizePhoneNumber(searchTerm);
+      // 🎯 PRIORIDADE: Busca por número de telefone (mais eficiente)
+      if (searchTermNumbers.length >= 4) { // Mínimo 4 dígitos para busca de número
+        const normalizedTitle = normalizePhoneNumber(conv.title || '');
+        // Busca exata ou parcial no número
+        if (normalizedTitle.includes(searchTermNumbers)) {
+          return true;
+        }
+        
+        // Busca em participantes (números)
+        const participantMatch = conv.participants?.some(p => 
+          normalizePhoneNumber(p).includes(searchTermNumbers)
+        ) || false;
+        
+        if (participantMatch) return true;
+      }
       
-      // Busca normal no título
+      // Busca textual secundária (título, participantes, mensagens)
       const titleMatch = conv.title?.toLowerCase().includes(searchTermLower) || false;
-      
-      // Busca flexível em números de telefone no título (remove formatação)
-      const phoneMatch = searchTermNumbers.length >= 3 ? 
-        normalizePhoneNumber(conv.title || '').includes(searchTermNumbers) : false;
-      
       const participantsMatch = conv.participants?.some(p => 
         p?.toLowerCase().includes(searchTermLower)
       ) || false;
       
-      const messagesMatch = conv.messages?.some(m => 
-        m?.content?.toLowerCase().includes(searchTermLower)
-      ) || false;
+      // Só busca em mensagens se for termo textual (não numérico)
+      const messagesMatch = searchTermNumbers.length < 4 ? 
+        conv.messages?.some(m => m?.content?.toLowerCase().includes(searchTermLower)) || false : false;
       
-      return titleMatch || phoneMatch || participantsMatch || messagesMatch;
-    }), [conversations, searchTerm, normalizePhoneNumber]);
+      return titleMatch || participantsMatch || messagesMatch;
+    });
+  }, [conversations, searchTerm, normalizePhoneNumber]);
 
   // Paginação com carregamento lazy
   const totalPages = Math.ceil(filteredConversations.length / conversationsPerPage);
@@ -766,7 +781,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400/70 w-4 h-4" />
                     <Input
-                        placeholder="Pesquisar por número, nome ou mensagem..."
+                        placeholder="🔍 Digite o número: (71) 9644-0261 ou 71964402..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-black/60 border-purple-800/60 text-white placeholder:text-purple-400/60 focus:border-purple-600/80 backdrop-blur-sm"
@@ -863,18 +878,31 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     {!isFetching && filteredConversations.length === 0 && conversations.length > 0 && (
                     <div className="text-center py-8 text-purple-300/70">
                         <Search className="w-12 h-12 mx-auto mb-4 opacity-50 text-purple-400/60" />
-                        <p className="text-white">Nenhuma conversa encontrada</p>
-                        <p className="text-sm text-purple-300/60">Tente pesquisar com outros termos</p>
+                        <p className="text-white">Nenhum resultado encontrado</p>
+                        <p className="text-sm text-purple-300/60">Digite um número específico: (71) 9644-0261</p>
+                    </div>
+                    )}
+                    
+                    {/* Dica quando há muitas conversas mas não há busca */}
+                    {!isFetching && !searchTerm.trim() && conversations.length > 100 && (
+                    <div className="mx-2 mb-4 p-3 bg-purple-900/20 border border-purple-800/30 rounded-lg">
+                        <div className="flex items-center gap-2 text-purple-300 text-xs">
+                            <Search className="w-4 h-4" />
+                            <span>💡 Com {conversations.length} conversas, use a busca para encontrar números específicos!</span>
+                        </div>
                     </div>
                     )}
                 </div>
                 
-                {/* Paginação */}
-                {totalPages > 1 && (
+                {/* Paginação - só aparece sem busca ativa */}
+                {totalPages > 1 && !searchTerm.trim() && (
                   <div className="p-4 border-t border-purple-900/40">
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-purple-300/70">
-                        Página {currentPage} de {totalPages} • {filteredConversations.length} conversas
+                        {searchTerm.trim() 
+                          ? `🔍 ${filteredConversations.length} resultado(s) encontrado(s)` 
+                          : `Página ${currentPage} de ${totalPages} • ${conversations.length} conversas carregadas`
+                        }
                       </p>
                       <div className="flex items-center gap-2">
                         <Button
