@@ -168,12 +168,7 @@ export class AutoCompressUploader {
 
     if (this.onProgress) this.onProgress(70, `Criando ${conversationIds.size} conversas válidas...`);
 
-    // **PRIMEIRO: CRIAR CONVERSAS VAZIAS**
-    await this.createConversations(Array.from(conversationIds) as string[], userId);
-
-    if (this.onProgress) this.onProgress(75, `Salvando ${messagesToInsert.length} mensagens no banco...`);
-
-    // **PRIMEIRO: CRIAR CONVERSAS VAZIAS**
+    // **CRIAR CONVERSAS COM TÍTULOS FORMATADOS**
     await this.createConversations(Array.from(conversationIds) as string[], userId, conversationPhones);
 
     if (this.onProgress) this.onProgress(75, `Salvando ${messagesToInsert.length} mensagens no banco...`);

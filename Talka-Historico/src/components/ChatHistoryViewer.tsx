@@ -79,15 +79,12 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   };
 
   // Estados simplificados (removendo paginação complexa)
-  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
 
   // Função para buscar conversas salvas da API (simplificada, sem paginação)
   const fetchConversations = useCallback(async (reset = false) => {
     if (reset) {
       setConversations([]);
     }
-    
-    setIsLoadingConversations(true); // Loading específico para visualização
     
     try {
         console.log(`🚀 Carregando todas as conversas para visualização...`);
@@ -130,7 +127,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             variant: "destructive"
         });
     } finally {
-        setIsLoadingConversations(false);
         setIsFetching(false);
         setIsLoadingAfterUpload(false);
     }
@@ -840,19 +836,6 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                     </div>
                     )}
                 </div>
-                
-                {/* Loading específico para visualização */}
-                {isLoadingConversations && (
-                  <div className="p-8 text-center">
-                    <div className="inline-flex items-center text-purple-400">
-                      <div className="animate-spin w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full mr-3"></div>
-                      <span>Carregando conversas para visualização...</span>
-                    </div>
-                    <p className="text-xs text-purple-300/60 mt-2">
-                      Preparando todas as conversas importadas
-                    </p>
-                  </div>
-                )}
                 
                 {/* Paginação */}
                 {totalPages > 1 && (
