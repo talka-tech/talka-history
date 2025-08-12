@@ -29,13 +29,13 @@ export default async function handler(request: Request) {
 
         console.log(`🚀 Carregando conversas: userId=${userId}, limit=${limit}`);
         
-        // PRIMEIRA QUERY: Busca conversas (otimizado) - SEM LIMITE NENHUM!
+        // PRIMEIRA QUERY: Busca conversas (otimizado) - LIMITE EXPLICITO ALTO!
         const { data: conversations, error: convError } = await supabase
             .from('conversations')
             .select('id, title, user_id, created_at')
             .eq('user_id', parseInt(userId))
-            .order('created_at', { ascending: false });
-            // ☝️ REMOVIDO .limit() COMPLETAMENTE!
+            .order('created_at', { ascending: false })
+            .limit(50000); // LIMITE EXPLÍCITO ALTO para garantir todas as conversas
 
         if (convError) {
             console.error('❌ Erro ao buscar conversas:', convError);
