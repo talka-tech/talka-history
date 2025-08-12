@@ -107,7 +107,21 @@ export default async function handler(request: Request) {
         console.log(`🔍 DEBUGGING: Primeiras 3 conversationsWithMessages:`, conversationsWithMessages.slice(0, 3));
         console.log(`🔍 DEBUGGING: JSON.stringify().length =`, JSON.stringify(conversationsWithMessages).length);
 
-        return new Response(JSON.stringify(conversationsWithMessages), {
+        // DEBUGGING: Adiciona logs no response para debug
+        const debugInfo = {
+            supabaseReturnedCount: conversations.length,
+            finalArrayCount: conversationsWithMessages.length,
+            messagesCount: messages?.length || 0,
+            isProduction: process.env.NODE_ENV === 'production'
+        };
+
+        // TEMPORÁRIO: Adiciona debug info no response
+        const responseWithDebug = {
+            conversations: conversationsWithMessages,
+            debug: debugInfo
+        };
+
+        return new Response(JSON.stringify(responseWithDebug), {
             status: 200, headers: { 'Content-Type': 'application/json' }
         });
 

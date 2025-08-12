@@ -120,8 +120,21 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         }
         
         console.log(`🔍 DEBUGGING FRONTEND: Iniciando response.json()...`);
-        const allConversations = await response.json();
+        const responseData = await response.json();
         console.log(`🔍 DEBUGGING FRONTEND: response.json() concluído!`);
+        console.log(`🔍 DEBUGGING FRONTEND: responseData =`, responseData);
+        
+        // Verifica se é o formato novo com debug
+        let allConversations;
+        if (responseData.conversations && responseData.debug) {
+            console.log(`🔍 DEBUGGING FRONTEND: Formato com debug detectado!`);
+            console.log(`🔍 DEBUGGING FRONTEND: Debug info:`, responseData.debug);
+            allConversations = responseData.conversations;
+        } else {
+            console.log(`🔍 DEBUGGING FRONTEND: Formato normal detectado!`);
+            allConversations = responseData;
+        }
+        
         console.log(`🔍 DEBUGGING FRONTEND: allConversations =`, allConversations);
         console.log(`🔍 DEBUGGING FRONTEND: typeof allConversations =`, typeof allConversations);
         console.log(`🔍 DEBUGGING FRONTEND: Array.isArray(allConversations) =`, Array.isArray(allConversations));
