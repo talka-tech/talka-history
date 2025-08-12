@@ -35,8 +35,8 @@ export default async function handler(req: any, res: any) {
     // Primeiro: buscar TODAS as conversas do usuário (sem limite)
     console.log(`🔍 Buscando TODAS as conversas para usuário ${userId}...`);
     
-    // MÉTODO BRUTAL: Deleta TUDO de uma vez - mais simples e eficiente
-    console.log(`🗑️ MODO BRUTAL: Deletando TODAS as mensagens do usuário ${userId}...`);
+    // MÉTODO TURBO: Chunks grandes mas sem timeout
+    console.log(`🗑️ MODO TURBO: Deletando mensagens em chunks para usuário ${userId}...`);
     
     // Step 1: Get all conversation IDs for this user first
     const { data: userConversations, error: convFetchError } = await supabase
@@ -56,36 +56,53 @@ export default async function handler(req: any, res: any) {
     let deletedConversationsCount = 0;
 
     if (conversationIds.length > 0) {
-      // Step 2: Delete all messages for these conversations
-      const { error: messagesDeleteError, count: msgCount } = await supabase
-        .from('messages')
-        .delete({ count: 'exact' })
-        .in('conversation_id', conversationIds);
-
-      if (messagesDeleteError) {
-        console.error('❌ Erro ao deletar mensagens:', messagesDeleteError);
-        throw new Error(`Erro ao deletar mensagens: ${messagesDeleteError.message}`);
+      // 🚀 DELETAR EM CHUNKS DE 2000 (mais rápido que 500, sem timeout)
+      const CHUNK_SIZE = 2000;
+      const chunks: string[][] = [];
+      for (let i = 0; i < conversationIds.length; i += CHUNK_SIZE) {
+        chunks.push(conversationIds.slice(i, i + CHUNK_SIZE));
       }
 
-      deletedMessagesCount = msgCount || 0;
-      console.log(`✅ ${deletedMessagesCount} mensagens deletadas`);
+      console.log(`📦 Processando ${chunks.length} chunks de até ${CHUNK_SIZE} registros...`);
+
+      // Deletar mensagens em chunks
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        console.log(`🗑️ Deletando mensagens do chunk ${i + 1}/${chunks.length} (${chunk.length} conversas)...`);
+        
+        const { error: messagesDeleteError, count: msgCount } = await supabase
+          .from('messages')
+          .delete({ count: 'exact' })
+          .in('conversation_id', chunk);
+
+        if (messagesDeleteError) {
+          console.error('❌ Erro ao deletar mensagens:', messagesDeleteError);
+          throw new Error(`Erro ao deletar mensagens: ${messagesDeleteError.message}`);
+        }
+
+        deletedMessagesCount += msgCount || 0;
+      }
+
+      console.log(`✅ Total: ${deletedMessagesCount} mensagens deletadas`);
+
+      // Deletar conversas em chunks
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        console.log(`🗑️ Deletando conversas do chunk ${i + 1}/${chunks.length} (${chunk.length} conversas)...`);
+        
+        const { error: conversationsDeleteError, count: convCount } = await supabase
+          .from('conversations')
+          .delete({ count: 'exact' })
+          .in('id', chunk);
+
+        if (conversationsDeleteError) {
+          console.error('❌ Erro ao deletar conversas:', conversationsDeleteError);
+          throw new Error(`Erro ao deletar conversas: ${conversationsDeleteError.message}`);
+        }
+
+        deletedConversationsCount += convCount || 0;
+      }
     }
-
-    // Step 3: Delete all conversations for this user
-    console.log(`🗑️ MODO BRUTAL: Deletando TODAS as ${conversationIds.length} conversas do usuário ${userId}...`);
-    
-    const { error: conversationsDeleteError, count: convCount } = await supabase
-      .from('conversations')
-      .delete({ count: 'exact' })
-      .eq('user_id', userId);
-
-    if (conversationsDeleteError) {
-      console.error('❌ Erro ao deletar conversas:', conversationsDeleteError);
-      throw new Error(`Erro ao deletar conversas: ${conversationsDeleteError.message}`);
-    }
-
-    deletedConversationsCount = convCount || 0;
-    console.log(`✅ ${deletedConversationsCount} conversas deletadas`);
 
     console.log(`🎉 Limpeza concluída: ${deletedConversationsCount} conversas e ${deletedMessagesCount} mensagens removidas`);
 
@@ -94,7 +111,7 @@ export default async function handler(req: any, res: any) {
       deletedConversations: deletedConversationsCount,
       deletedMessages: deletedMessagesCount,
       message: `${deletedConversationsCount} conversas e ${deletedMessagesCount} mensagens removidas com sucesso!`,
-      method: 'supabase-brutal-mode'
+      method: 'supabase-turbo-mode'
     });
 
   } catch (error) {
