@@ -73,10 +73,16 @@ export class AutoCompressUploader {
 
   async processCompressedCSV(compressedData: Uint8Array, originalText: string, userId: number, originalSize: number, compressedSize: number): Promise<any> {
     // Trabalha com o texto original para processamento, mas mantém estatísticas de compressão
-    const lines = originalText.split('\n').filter(line => line.trim());
+    const rawLines = originalText.split('\n').filter(line => line.trim());
+    
+    if (this.onProgress) this.onProgress(30, 'Corrigindo formato do CSV...');
+    
+    // CORREÇÃO: Reconstrói linhas quebradas do CSV malformado
+    const lines = this.fixBrokenCSVLines(rawLines);
+    
     const headers = lines[0].split(',').map(h => h.trim().replace(/['"]/g, ''));
     
-    if (this.onProgress) this.onProgress(30, 'Processando mensagens...');
+    if (this.onProgress) this.onProgress(35, 'Processando mensagens...');
 
     const messagesToInsert: any[] = [];
     const conversationIds = new Set(); // Só adiciona conversas que têm mensagens válidas
@@ -90,7 +96,7 @@ export class AutoCompressUploader {
       if (!line.trim()) continue;
       
       const values = this.parseCSVLine(line);
-      if (values.length < headers.length) continue;
+      if (values.length < headers.length - 2) continue; // Tolerância para campos faltantes
 
       const data: any = {};
       headers.forEach((h, index) => {
@@ -121,8 +127,8 @@ export class AutoCompressUploader {
       
       // PROGRESSO REAL E PRECISO - atualiza a cada 25 linhas ou no final
       if (processedLines % 25 === 0 || processedLines === totalLines || i === lines.length - 1) {
-        const processingProgress = Math.min(40, (processedLines / totalLines) * 40);
-        const currentProgress = 30 + processingProgress;
+        const processingProgress = Math.min(35, (processedLines / totalLines) * 35);
+        const currentProgress = 35 + processingProgress;
         
         if (this.onProgress) {
           this.onProgress(
@@ -137,7 +143,8 @@ export class AutoCompressUploader {
     }
 
     console.log(`📊 ESTATÍSTICAS DO PROCESSAMENTO:`);
-    console.log(`   📄 Total de linhas: ${totalLines}`);
+    console.log(`   📄 Total de linhas brutas: ${rawLines.length}`);
+    console.log(`   🔧 Linhas corrigidas: ${lines.length}`);
     console.log(`   📝 Mensagens válidas: ${messagesToInsert.length}`);
     console.log(`   💬 Conversas com mensagens válidas: ${conversationIds.size}`);
     
@@ -278,7 +285,7 @@ export class AutoCompressUploader {
     console.log(`🔄 Otimizando títulos de ${conversationIds.length} conversas...`);
     
     const convIds = conversationIds.map(id => parseInt(id));
-    const lastMessageByConv = new Map();
+    const conversationData = new Map(); // Armazena dados para gerar títulos
     
     // Processa em lotes menores para evitar URLs muito longas
     const UPDATE_BATCH_SIZE = 500; // Reduzido para evitar erro de URL longa
@@ -287,8 +294,8 @@ export class AutoCompressUploader {
       const batch = convIds.slice(i, i + UPDATE_BATCH_SIZE);
       console.log(`📦 Processando lote ${Math.floor(i / UPDATE_BATCH_SIZE) + 1}/${Math.ceil(convIds.length / UPDATE_BATCH_SIZE)} para títulos...`);
       
-      // QUERY OTIMIZADA: Busca última mensagem de cada conversa em lotes
-      const { data: lastMessages, error } = await supabase
+      // QUERY OTIMIZADA: Busca informações das conversas incluindo mobile_number
+      const { data: messages, error } = await supabase
         .from('messages')
         .select(`
           conversation_id,
@@ -305,20 +312,32 @@ export class AutoCompressUploader {
         continue; // Continua com próximo lote mesmo se um falhar
       }
 
-      // Agrupa por conversation_id e pega a primeira (mais recente) de cada grupo
-      lastMessages?.forEach(msg => {
-        if (!lastMessageByConv.has(msg.conversation_id)) {
-          lastMessageByConv.set(msg.conversation_id, msg);
+      // Agrupa por conversation_id e coleta informações
+      messages?.forEach(msg => {
+        if (!conversationData.has(msg.conversation_id)) {
+          // Para cada conversa, procura a primeira mensagem recebida (não enviada) que tem o número
+          const senderWithNumber = msg.sender && msg.sender.startsWith('+') ? msg.sender : null;
+          conversationData.set(msg.conversation_id, {
+            lastMessage: msg,
+            phoneNumber: senderWithNumber
+          });
+        } else {
+          // Atualiza o número do telefone se encontrar um melhor
+          const current = conversationData.get(msg.conversation_id);
+          if (!current.phoneNumber && msg.sender && msg.sender.startsWith('+')) {
+            current.phoneNumber = msg.sender;
+            conversationData.set(msg.conversation_id, current);
+          }
         }
       });
     }
     
     // BATCH UPDATE: Atualiza títulos em lotes
     const updates = convIds.map(convId => {
-      const lastMessage = lastMessageByConv.get(convId);
+      const data = conversationData.get(convId);
       return {
         id: convId,
-        title: lastMessage ? this.generateConversationTitle(lastMessage) : `Conversa ${convId}`
+        title: data ? this.generateConversationTitle(data.lastMessage, data.phoneNumber) : `Conversa ${convId}`
       };
     });
     
@@ -342,20 +361,11 @@ export class AutoCompressUploader {
     console.log(`🎉 TÍTULOS OTIMIZADOS: ${conversationIds.length} conversas atualizadas!`);
   }
 
-  generateConversationTitle(lastMessage: any): string {
-    // Se for mensagem enviada por mim, usa o número do contato ou ID da conversa
-    if (lastMessage.fromMe) {
-      // Se temos o número do contato na conversa, vamos buscar na primeira mensagem não enviada por mim
-      return `Conversa ${lastMessage.conversation_id}`;
-    }
-    
-    // Se for mensagem recebida, usa o sender (que já tem o número formatado)
-    const sender = lastMessage.sender || `Conversa ${lastMessage.conversation_id}`;
-    
-    // Se o sender é um número completo (+55...), formata melhor
-    if (sender.startsWith('+55') && sender.length > 10) {
-      // Extrai apenas os últimos 9 dígitos para display mais limpo
-      const cleaned = sender.replace('+55', '');
+  generateConversationTitle(lastMessage: any, phoneNumber?: string): string {
+    // Prioriza o número de telefone direto se disponível
+    if (phoneNumber && phoneNumber.startsWith('+55') && phoneNumber.length > 10) {
+      // Formata número brasileiro
+      const cleaned = phoneNumber.replace('+55', '');
       if (cleaned.length >= 11) {
         // Formato: (XX) 9XXXX-XXXX
         return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 3)}${cleaned.substring(3, 7)}-${cleaned.substring(7)}`;
@@ -365,7 +375,27 @@ export class AutoCompressUploader {
       }
     }
     
-    return sender;
+    // Fallback para o sender da última mensagem
+    if (lastMessage && !lastMessage.fromMe) {
+      const sender = lastMessage.sender || `Conversa ${lastMessage.conversation_id}`;
+      
+      // Se o sender é um número completo (+55...), formata melhor
+      if (sender.startsWith('+55') && sender.length > 10) {
+        const cleaned = sender.replace('+55', '');
+        if (cleaned.length >= 11) {
+          // Formato: (XX) 9XXXX-XXXX
+          return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 3)}${cleaned.substring(3, 7)}-${cleaned.substring(7)}`;
+        } else if (cleaned.length === 10) {
+          // Formato: (XX) XXXX-XXXX
+          return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6)}`;
+        }
+      }
+      
+      return sender;
+    }
+    
+    // Último fallback
+    return lastMessage ? `Conversa ${lastMessage.conversation_id}` : 'Conversa sem título';
   }
 
   getSenderName(data: any): string {
@@ -399,6 +429,68 @@ export class AutoCompressUploader {
     
     result.push(current);
     return result;
+  }
+
+  // Função para corrigir linhas quebradas do CSV malformado
+  fixBrokenCSVLines(lines: string[]): string[] {
+    const headers = lines[0].split(',').map(h => h.trim().replace(/['"]/g, ''));
+    const expectedColumns = headers.length;
+    const fixedLines: string[] = [lines[0]]; // Mantém o header
+    
+    let i = 1;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) {
+        i++;
+        continue;
+      }
+      
+      const values = this.parseCSVLine(line);
+      
+      // Se a linha tem o número correto de campos, adiciona normalmente
+      if (values.length >= expectedColumns) {
+        fixedLines.push(line);
+        i++;
+        continue;
+      }
+      
+      // Se a linha tem menos campos, tenta juntar com as próximas linhas
+      let reconstructedLine = line;
+      let totalValues = values.length;
+      let nextIndex = i + 1;
+      
+      // Tenta juntar até 3 linhas seguintes para reconstruir a linha completa
+      while (nextIndex < lines.length && totalValues < expectedColumns) {
+        const nextLine = lines[nextIndex];
+        if (!nextLine.trim()) {
+          nextIndex++;
+          continue;
+        }
+        
+        const nextValues = this.parseCSVLine(nextLine);
+        
+        // Se a próxima linha parece ser o final da linha atual (poucos campos)
+        if (nextValues.length <= (expectedColumns - totalValues)) {
+          reconstructedLine += ',' + nextLine;
+          totalValues += nextValues.length;
+          nextIndex++;
+        } else {
+          // Se a próxima linha tem muitos campos, pare de juntar
+          break;
+        }
+      }
+      
+      // Verifica se conseguiu reconstruir corretamente
+      const finalValues = this.parseCSVLine(reconstructedLine);
+      if (finalValues.length >= expectedColumns - 1) { // Permite 1 campo a menos por tolerância
+        fixedLines.push(reconstructedLine);
+      }
+      
+      i = nextIndex;
+    }
+    
+    console.log(`🔧 CSV corrigido: ${lines.length - 1} → ${fixedLines.length - 1} linhas válidas`);
+    return fixedLines;
   }
 
   formatBytes(bytes: number): string {
