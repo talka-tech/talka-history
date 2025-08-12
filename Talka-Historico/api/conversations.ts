@@ -27,52 +27,20 @@ export default async function handler(request: Request) {
             });
         }
 
-        console.log(`🚀 Carregando conversas: userId=${userId} (buscando TODAS as 11k+)`);
+        console.log(`🚀 Carregando conversas: userId=${userId} (usando .range() para bypass do limite 1000)`);
         
-        // PAGINAÇÃO AUTOMÁTICA: Busca TODAS as conversas em lotes
-        let allConversations: any[] = [];
-        let page = 0;
-        const pageSize = 1000; // Limite por página do Supabase
-        let hasMore = true;
-        
-        console.log(`📊 Iniciando busca paginada para carregar TODAS as conversas...`);
-        
-        while (hasMore && page < 20) { // Máximo 20 páginas = 20k conversas
-            const offset = page * pageSize;
-            console.log(`🔄 Página ${page + 1}: buscando conversas ${offset + 1}-${offset + pageSize}...`);
+        // SOLUÇÃO SIMPLES: Use .range() para buscar mais que 1000
+        const { data: conversations, error: convError } = await supabase
+            .from('conversations')
+            .select('id, title, user_id, created_at')
+            .eq('user_id', parseInt(userId))
+            .order('created_at', { ascending: false })
+            .range(0, 14999); // Busca até 15.000 conversas direto
             
-            const { data: pageConversations, error: pageError } = await supabase
-                .from('conversations')
-                .select('id, title, user_id, created_at')
-                .eq('user_id', parseInt(userId))
-                .order('created_at', { ascending: false })
-                .range(offset, offset + pageSize - 1); // range(0, 999) = 1000 rows
-                
-            if (pageError) {
-                console.error(`❌ Erro na página ${page + 1}:`, pageError);
-                throw pageError;
-            }
-            
-            if (!pageConversations || pageConversations.length === 0) {
-                console.log(`✅ Página ${page + 1} vazia - fim da busca`);
-                hasMore = false;
-                break;
-            }
-            
-            allConversations.push(...pageConversations);
-            console.log(`📈 Página ${page + 1}: +${pageConversations.length} conversas | Total: ${allConversations.length}`);
-            
-            // Se retornou menos que pageSize, é a última página
-            if (pageConversations.length < pageSize) {
-                console.log(`✅ Última página encontrada (${pageConversations.length} < ${pageSize})`);
-                hasMore = false;
-            }
-            
-            page++;
+        if (convError) {
+            console.error('❌ Erro ao buscar conversas:', convError);
+            throw convError;
         }
-        
-        const conversations = allConversations;
-        console.log(`🎉 PAGINAÇÃO CONCLUÍDA: ${conversations.length} conversas carregadas!`);
         
         if (!conversations || conversations.length === 0) {
             console.log('📭 Nenhuma conversa encontrada');
