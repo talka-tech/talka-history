@@ -72,7 +72,9 @@ export default async function handler(request: Request) {
         }
         
         const conversations = allConversations;
-        console.log(`🎉 PAGINAÇÃO CONCLUÍDA: ${conversations.length} conversas carregadas!`);        if (!conversations || conversations.length === 0) {
+        console.log(`🎉 PAGINAÇÃO CONCLUÍDA: ${conversations.length} conversas carregadas!`);
+        
+        if (!conversations || conversations.length === 0) {
             console.log('📭 Nenhuma conversa encontrada');
             return new Response(JSON.stringify([]), {
                 status: 200, headers: { 'Content-Type': 'application/json' }
