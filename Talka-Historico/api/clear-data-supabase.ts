@@ -32,19 +32,20 @@ export default async function handler(req: any, res: any) {
 
     console.log('🔑 Usando SERVICE_ROLE_KEY via cliente Supabase');
 
-    // Primeiro: buscar conversas do usuário
-    console.log(`🔍 Buscando conversas para usuário ${userId}...`);
+    // Primeiro: buscar TODAS as conversas do usuário (sem limite)
+    console.log(`🔍 Buscando TODAS as conversas para usuário ${userId}...`);
     const { data: conversations, error: fetchError } = await supabase
       .from('conversations')
       .select('id')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .limit(50000); // Força buscar até 50.000 conversas
 
     if (fetchError) {
       console.error('❌ Erro ao buscar conversas:', fetchError);
       throw new Error(`Erro ao buscar conversas: ${fetchError.message}`);
     }
 
-    console.log(`📋 Encontradas ${conversations?.length || 0} conversas para deletar:`, conversations);
+    console.log(`📋 Encontradas ${conversations?.length || 0} conversas para deletar (TOTAL SEM LIMITE):`, conversations?.length);
 
     let deletedConversations = 0;
     let deletedMessages = 0;
@@ -69,8 +70,8 @@ export default async function handler(req: any, res: any) {
       // Deletar mensagens primeiro (FK constraint) - EM LOTES para evitar timeout
       console.log(`🗑️ Deletando ${messageCount || 'todas as'} mensagens em lotes...`);
       
-      // Processa em lotes para evitar timeout
-      const DELETE_BATCH_SIZE = 1000;
+      // Processa em lotes menores para evitar timeout com muitas conversas
+      const DELETE_BATCH_SIZE = 500; // Reduzido para processar mais rápido
       let totalDeletedMessages = 0;
       
       for (let i = 0; i < conversationIds.length; i += DELETE_BATCH_SIZE) {
