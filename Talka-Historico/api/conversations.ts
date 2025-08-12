@@ -28,25 +28,62 @@ export default async function handler(request: Request) {
         }
 
         console.log(`🚀 Carregando conversas: userId=${userId}, limit=${limit}`);
-        console.log(`🔍 DEBUGGING: Testando query direta com limite super alto...`);
+        console.log(`🔍 DEBUGGING: IMPLEMENTANDO MÚLTIPLAS QUERIES para contornar limite 1000...`);
         
-        // TENTATIVA 1: Query direta com limite massivo
-        const { data: conversations, error: convError } = await supabase
-            .from('conversations')
-            .select('id, title, user_id, created_at')
-            .eq('user_id', parseInt(userId))
-            .order('created_at', { ascending: false })
-            .limit(100000); // LIMITE SUPER ALTO
+        // MÚLTIPLAS QUERIES: Busca em lotes para contornar limite do Supabase
+        let allConversations: any[] = [];
+        let offset = 0;
+        const batchSize = 1000; // Tamanho do lote (limite do Supabase)
+        let hasMore = true;
+        let batchCount = 0;
+        
+        while (hasMore && allConversations.length < 50000) {
+            const startRange = offset;
+            const endRange = offset + batchSize - 1;
+            console.log(`🔍 DEBUGGING: Batch ${batchCount}, range ${startRange}-${endRange}...`);
             
-        console.log(`🔍 DEBUGGING: Query executada!`);
-        console.log(`🔍 DEBUGGING: conversations =`, conversations?.length || 0, 'conversas');
-        console.log(`🔍 DEBUGGING: convError =`, convError);
-        console.log(`🔍 DEBUGGING: Tipo de conversations:`, typeof conversations, Array.isArray(conversations));
-        
-        if (convError) {
-            console.error('❌ Erro ao buscar conversas:', convError);
-            throw convError;
+            const { data: batchConversations, error: batchError } = await supabase
+                .from('conversations')
+                .select('id, title, user_id, created_at')
+                .eq('user_id', parseInt(userId))
+                .order('created_at', { ascending: false })
+                .range(startRange, endRange);
+                
+            console.log(`🔍 DEBUGGING: Batch ${batchCount} retornou:`, batchConversations?.length || 0, 'conversas');
+            
+            if (batchError) {
+                console.error('❌ Erro no batch', batchCount, ':', batchError);
+                throw batchError;
+            }
+            
+            if (!batchConversations || batchConversations.length === 0) {
+                console.log(`🔍 DEBUGGING: Batch ${batchCount} vazio, parando busca`);
+                hasMore = false;
+                break;
+            }
+            
+            allConversations.push(...batchConversations);
+            console.log(`🔍 DEBUGGING: Total acumulado: ${allConversations.length} conversas`);
+            
+            // Se retornou menos que batchSize, é o último lote
+            if (batchConversations.length < batchSize) {
+                console.log(`🔍 DEBUGGING: Batch ${batchCount} parcial (${batchConversations.length}), último lote`);
+                hasMore = false;
+            }
+            
+            offset += batchSize;
+            batchCount++;
+            
+            // Limite de segurança para evitar loop infinito
+            if (batchCount > 20) {
+                console.log(`🔍 DEBUGGING: Limite de 20 batches atingido, parando por segurança`);
+                break;
+            }
         }
+        
+        const conversations = allConversations;
+        console.log(`🔍 DEBUGGING: MÚLTIPLAS QUERIES finalizadas!`);
+        console.log(`🔍 DEBUGGING: Total final: ${conversations.length} conversas em ${batchCount} batches`);
 
         if (!conversations || conversations.length === 0) {
             console.log('📭 Nenhuma conversa encontrada');
