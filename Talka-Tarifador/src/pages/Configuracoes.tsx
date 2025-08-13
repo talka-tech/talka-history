@@ -4,18 +4,51 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Layout } from "@/components/layout/Layout"
-import { getCurrentClient } from "@/data/mockData"
+import { getCurrentClient, ClientData } from "@/data/mockData"
 import { useToast } from "@/hooks/use-toast"
+import { useState, useEffect } from "react"
 
 export default function Configuracoes() {
-  const client = getCurrentClient()
+  const [client, setClient] = useState<ClientData | null>(null)
+  const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+  
+  useEffect(() => {
+    const loadClient = async () => {
+      try {
+        setLoading(true)
+        const clientData = await getCurrentClient()
+        setClient(clientData)
+      } catch (error) {
+        console.error('Error loading client:', error)
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar dados do cliente",
+          variant: "destructive"
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadClient()
+  }, [toast])
 
   const handleSave = () => {
     toast({
       title: "Configurações salvas",
       description: "Suas configurações foram atualizadas com sucesso.",
     })
+  }
+
+  if (loading || !client) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+        </div>
+      </Layout>
+    )
   }
 
   return (

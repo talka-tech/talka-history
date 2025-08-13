@@ -76,10 +76,8 @@ const convertClientData = (client: Client): ClientData => {
 export const getCurrentClient = async (): Promise<ClientData> => {
   try {
     const storedUser = localStorage.getItem('talka-user')
-    console.log('🔍 Stored user from localStorage:', storedUser)
     
     if (!storedUser) {
-      console.log('❌ No user found in localStorage')
       // Return empty/default data if no user logged in
       return {
         id: 'empty',
@@ -92,11 +90,9 @@ export const getCurrentClient = async (): Promise<ClientData> => {
     }
 
     const user = JSON.parse(storedUser)
-    console.log('👤 Parsed user:', user)
     
     // If user is admin, show empty data (admin doesn't have client data)
     if (user.role === 'admin' || user.role === 'super_admin') {
-      console.log('👨‍💼 User is admin, returning admin data')
       return {
         id: 'admin',
         name: 'Painel Administrativo',
@@ -109,26 +105,17 @@ export const getCurrentClient = async (): Promise<ClientData> => {
 
     // If user is a client (role === 'client' OR 'user'), get real data from database
     if (user.role === 'client' || user.role === 'user') {
-      console.log('👤 User is client, fetching real data from database')
-      
       try {
         // Get all clients from database
         const clients = await clientAPI.getAllClients()
-        console.log('📊 All clients from database:', clients)
-        console.log('🔍 Looking for client with ID:', user.id)
         
         // Find the client by ID
         const client = clients.find(c => c.id === user.id)
-        console.log('✅ Found client:', client)
         
         if (client) {
-          const convertedData = convertClientData(client)
-          console.log('🔄 Converted client data:', convertedData)
-          return convertedData
+          return convertClientData(client)
         } else {
-          console.log('❌ Client not found in database with ID:', user.id)
           // Return user data as fallback until we figure out the database issue
-          console.log('🆘 Using user data as emergency fallback')
           return {
             id: user.id?.toString() || '3',
             name: user.name || 'WRL Bonés',
@@ -143,9 +130,7 @@ export const getCurrentClient = async (): Promise<ClientData> => {
           }
         }
       } catch (dbError) {
-        console.error('❌ Database error:', dbError)
         // Emergency fallback with user data
-        console.log('🆘 Database failed, using emergency fallback')
         return {
           id: user.id?.toString() || '3',
           name: user.name || 'WRL Bonés',
@@ -162,7 +147,6 @@ export const getCurrentClient = async (): Promise<ClientData> => {
     }
 
     // Fallback if no client found
-    console.log('⚠️ Using fallback data')
     return {
       id: user.id?.toString() || 'unknown',
       name: user.name || 'Cliente',
