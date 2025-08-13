@@ -67,9 +67,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' });
   
-  // 📄 Estados para paginação visual dos primeiros 1000
+  // 📄 Estados para paginação visual dos primeiros 100
   const [currentPage, setCurrentPage] = useState(1);
-  const conversationsPerPage = 50; // 50 conversas por página para boa visualização
+  const conversationsPerPage = 10; // 10 conversas por página para visualização ágil
   
   // 📅 Estados para filtro de data
   const [dateFilter, setDateFilter] = useState({
@@ -148,9 +148,9 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             // Busca específica que vai procurar em TODAS as conversas
             response = await fetch(`/api/search-conversations?userId=${currentUserId}&q=${encodeURIComponent(searchQuery)}&_=${Date.now()}`);
         } else {
-            // Carregamento padrão - primeiros 1000 para performance inicial
-            console.log(`📋 CARREGAMENTO PADRÃO - Primeiros 1000 para performance inicial`);
-            console.log(`🎯 LOG IMPORTANTE: Vai chamar API conversations (primeiros 1000)`);
+            // Carregamento padrão - primeiros 100 para visualização ágil
+            console.log(`📋 CARREGAMENTO PADRÃO - Primeiros 100 para visualização ágil`);
+            console.log(`🎯 LOG IMPORTANTE: Vai chamar API conversations (primeiros 100)`);
             response = await fetch(`/api/conversations?userId=${currentUserId}&_=${Date.now()}`);
         }
         
@@ -175,8 +175,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
             console.log(`🎯 BUSCA INDIVIDUAL: ${allConversations.length} conversas encontradas para "${searchQuery}" (pesquisou entre todas as 11k)`);
             console.log(`🔍 LOG RESULTADO BUSCA: ${allConversations.length > 0 ? 'SUCESSO' : 'NENHUM RESULTADO'}`);
         } else {
-            console.log(`✅ CARREGAMENTO PADRÃO: ${allConversations.length} conversas (primeiros 1000 para performance inicial)`);
-            console.log(`📊 LOG RESULTADO PADRÃO: ${allConversations.length === 1000 ? 'LIMITE ATINGIDO' : allConversations.length + ' TOTAL'}`);
+            console.log(`✅ CARREGAMENTO PADRÃO: ${allConversations.length} conversas (primeiros 100 para visualização ágil)`);
+            console.log(`📊 LOG RESULTADO PADRÃO: ${allConversations.length === 100 ? 'LIMITE ATINGIDO' : allConversations.length + ' TOTAL'}`);
         }
         
         console.log(`🎉 LOG FINAL: setConversations vai receber ${allConversations.length} conversas`);
@@ -412,7 +412,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       } 
       // VOLTAR AO PADRÃO: campo vazio - carrega primeiros 1000 para performance
       else if (searchTerm.trim().length === 0) {
-        console.log(`🔄 VOLTANDO PARA CARREGAMENTO PADRÃO (primeiros 1000)`);
+        console.log(`🔄 VOLTANDO PARA CARREGAMENTO PADRÃO (primeiros 100)`);
         console.log(`📋 LOG TRIGGER: Vai executar fetchConversations padrão`);
         fetchConversations(true);
       }
@@ -749,7 +749,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     return filtered;
   }, [conversations, dateFilter]);
 
-  // 📄 PAGINAÇÃO: Para carregamento padrão (primeiros 1000) aplicamos paginação visual
+  // 📄 PAGINAÇÃO: Para carregamento padrão (primeiros 100) aplicamos paginação visual
   // Para busca individual, mostra todos os resultados sem paginação
   const { currentConversations, totalPages, hasNextPage, hasPrevPage } = useMemo(() => {
     const isSearchActive = searchTerm.trim().length >= 3;
@@ -772,7 +772,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
         hasPrevPage: false
       };
     } else {
-      // 📄 CARREGAMENTO PADRÃO: Aplica paginação nos primeiros 1000
+      // 📄 CARREGAMENTO PADRÃO: Aplica paginação nos primeiros 100
       const startIndex = (currentPage - 1) * conversationsPerPage;
       const endIndex = startIndex + conversationsPerPage;
       const paginatedConversations = filteredConversations.slice(startIndex, endIndex);
@@ -932,7 +932,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                                 {searchTerm ? (
                                     `🔍 ${filteredConversations.length} encontradas por busca individual`
                                 ) : (
-                                    `📊 ${conversations.length} de ${totalConversations} conversas • Página ${currentPage}/${totalPages}`
+                                    `📊 ${conversations.length} primeiros • ${totalConversations} total • Pág ${currentPage}/10`
                                 )}
                             </p>
                         </div>
@@ -1111,7 +1111,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400/70 w-4 h-4" />
                     <Input
-                        placeholder="Digite o número para buscar entre TODAS as 11k conversas..."
+                        placeholder="Busca nos primeiros 100 • Digite 3+ chars para buscar nas 11k"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-black/60 border-purple-800/60 text-white placeholder:text-purple-400/60 focus:border-purple-600/80 backdrop-blur-sm"

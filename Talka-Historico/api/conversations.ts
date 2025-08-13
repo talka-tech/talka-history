@@ -26,17 +26,17 @@ export default async function handler(request: Request) {
             });
         }
 
-        console.log(`🚀 Carregamento PADRÃO: userId=${userId} (primeiros 1000 para performance)`);
+        console.log(`🚀 Carregamento PADRÃO: userId=${userId} (primeiros 100 para visualização ágil)`);
         console.log(`📋 LOG SISTEMA HÍBRIDO: API conversations.ts chamada - carregamento PADRÃO`);
         console.log(`🔧 LOG DEBUG: timestamp=${new Date().toISOString()}`);
         
-        // CARREGAMENTO PADRÃO: Primeiros 1000 para performance inicial
+        // CARREGAMENTO PADRÃO: Primeiros 100 para visualização ágil em 10 páginas
         const { data: conversations, error } = await supabase
             .from('conversations')
             .select('id, title, user_id, created_at')
             .eq('user_id', parseInt(userId))
             .order('created_at', { ascending: false })
-            .limit(1000); // Limita aos primeiros 1000 para performance
+            .limit(100); // Limita aos primeiros 100 para paginação ágil (10 páginas de 10)
             
         if (error) {
             console.error('❌ Erro ao buscar conversas:', error);
@@ -52,10 +52,10 @@ export default async function handler(request: Request) {
             });
         }
 
-        console.log(`📊 CARREGAMENTO PADRÃO: ${conversations.length} conversas (primeiros 1000 para performance inicial)`);
+        console.log(`📊 CARREGAMENTO PADRÃO: ${conversations.length} conversas (primeiros 100 para visualização ágil)`);
         
         // 🔍 LOG: Análise dos títulos das conversas do carregamento padrão
-        console.log(`🔍 TÍTULOS DAS CONVERSAS (CARREGAMENTO PADRÃO - PRIMEIROS 1000):`);
+        console.log(`🔍 TÍTULOS DAS CONVERSAS (CARREGAMENTO PADRÃO - PRIMEIROS 100):`);
         const firstFive = conversations.slice(0, 5);
         firstFive.forEach((conv, index) => {
             console.log(`  ${index + 1}. ID: ${conv.id} | Título: "${conv.title}" | Created: ${conv.created_at}`);
@@ -67,13 +67,13 @@ export default async function handler(request: Request) {
         const conversationIds = conversations.map(c => c.id);
         console.log(`📋 Buscando mensagens para ${conversationIds.length} conversas...`);
 
-        // SEGUNDA QUERY: Busca todas as mensagens das conversas (otimizado com limite)
+        // SEGUNDA QUERY: Busca todas as mensagens das conversas (otimizado para 100 conversas)
         const { data: messages, error: msgError } = await supabase
             .from('messages')
             .select('id, timestamp, sender, content, fromMe, conversation_id, created_at')
             .in('conversation_id', conversationIds)
             .order('conversation_id, timestamp', { ascending: true })
-            .limit(50000); // Limite aumentado para grandes volumes
+            .limit(10000); // Limite reduzido para 100 conversas
 
         if (msgError) {
             console.error('❌ Erro ao buscar mensagens:', msgError);
@@ -106,8 +106,8 @@ export default async function handler(request: Request) {
             supabaseReturnedCount: conversations.length,
             finalArrayCount: conversationsWithMessages.length,
             messagesCount: messages?.length || 0,
-            totalAvailable: conversations.length >= 1000 ? '11400+' : conversations.length,
-            isLimitReached: conversations.length >= 1000,
+            totalAvailable: '11400+ (mostrando primeiros 100)',
+            isLimitReached: conversations.length >= 100,
             isProduction: process.env.NODE_ENV === 'production'
         };
 
