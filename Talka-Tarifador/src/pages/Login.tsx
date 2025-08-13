@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
+import { authAPI } from "@/api/authAPI"
 
 export default function Login() {
   const [email, setEmail] = useState("")
@@ -14,6 +15,11 @@ export default function Login() {
   const [error, setError] = useState("")
   const { login, isLoading } = useAuth()
   const { toast } = useToast()
+
+  // Test Supabase connection on component mount
+  useEffect(() => {
+    authAPI.testSupabaseConnection()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

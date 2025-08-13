@@ -4,7 +4,7 @@ export interface User {
   name: string
   email: string
   company: string
-  role: 'admin' | 'client'
+  role: 'admin' | 'client' | 'user'
   createdAt: string
   lastLogin?: string
   isActive: boolean

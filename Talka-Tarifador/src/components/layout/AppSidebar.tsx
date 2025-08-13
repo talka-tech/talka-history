@@ -14,13 +14,27 @@ import {
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
-import { getCurrentClient } from "@/data/mockData"
+import { getCurrentClient, ClientData } from "@/data/mockData"
+import { useState, useEffect } from "react"
 
 export function AppSidebar() {
   const { state } = useSidebar()
   const { user, logout, isAdmin } = useAuth()
+  const [client, setClient] = useState<ClientData | null>(null)
   const collapsed = state === "collapsed"
-  const client = getCurrentClient()
+
+  useEffect(() => {
+    const loadClient = async () => {
+      try {
+        const clientData = await getCurrentClient()
+        setClient(clientData)
+      } catch (error) {
+        console.error('Error loading client:', error)
+      }
+    }
+
+    loadClient()
+  }, [])
 
   // Navigation items based on user role
   const navigation = isAdmin ? [
@@ -62,12 +76,16 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-card-border/50 p-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center shadow-md">
-            <BarChart3 className="h-5 w-5 text-accent-foreground" />
+            <img 
+              src="/logo.png" 
+              alt="Talka Logo" 
+              className="h-6 w-6 object-contain filter brightness-0 saturate-0 opacity-60"
+            />
           </div>
           {!collapsed && (
             <div className="flex-1">
               <h1 className="font-bold text-lg bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                TALKA
+                Tarifador Talka
               </h1>
               <p className="text-xs text-muted-foreground font-medium">Tarifador + BI</p>
             </div>
@@ -89,7 +107,7 @@ export function AppSidebar() {
                 {isAdmin ? 'Administrador' : 'Bem-vindo(a)'}
               </p>
             </div>
-            <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{client?.name || 'Carregando...'}</p>
             <p className="text-xs text-muted-foreground truncate">{user.company}</p>
             {isAdmin && (
               <div className="mt-2">

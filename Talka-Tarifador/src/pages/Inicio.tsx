@@ -3,13 +3,46 @@ import { MetricCard } from "@/components/dashboard/MetricCard"
 import { ProgressCard } from "@/components/dashboard/ProgressCard"
 import { AlertCard } from "@/components/dashboard/AlertCard"
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart"
-import { getCurrentClient, formatLastUsage } from "@/data/mockData"
+import { getCurrentClient, formatLastUsage, ClientData } from "@/data/mockData"
 import { useToast } from "@/hooks/use-toast"
 import { Layout } from "@/components/layout/Layout"
+import { useState, useEffect } from "react"
 
 export default function Inicio() {
-  const client = getCurrentClient()
+  const [client, setClient] = useState<ClientData | null>(null)
+  const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+  
+  useEffect(() => {
+    const loadClient = async () => {
+      try {
+        setLoading(true)
+        const clientData = await getCurrentClient()
+        setClient(clientData)
+      } catch (error) {
+        console.error('Error loading client:', error)
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar dados do cliente",
+          variant: "destructive"
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadClient()
+  }, [toast])
+
+  if (loading || !client) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+        </div>
+      </Layout>
+    )
+  }
   
   const usagePercentage = Math.round((client.credits.used / client.credits.total) * 100)
   
@@ -42,15 +75,18 @@ export default function Inicio() {
             </p>
           </div>
 
-          {/* Alertas */}
-          {(getAlertType() === "warning" || getAlertType() === "blocked") && (
-            <AlertCard 
-              type={getAlertType() as "warning" | "blocked"}
-              percentage={usagePercentage}
-              clientType={client.type}
+          {/* Consumo Mensal */}
+          <div className="grid gap-6 md:grid-cols-1">
+            <ProgressCard
+              title="Consumo Mensal"
+              current={client.credits.used}
+              total={client.credits.total}
+              variant={usagePercentage >= 100 ? "destructive" : usagePercentage >= 85 ? "warning" : "default"}
+              showAlert={getAlertType() === "warning" || getAlertType() === "blocked"}
+              alertType={getAlertType() as "warning" | "blocked"}
               onUpgrade={handleUpgrade}
             />
-          )}
+          </div>
 
           {/* Cards de Métricas */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -83,16 +119,6 @@ export default function Inicio() {
               value={formatLastUsage(client.lastUsage)}
               subtitle="Interação com IA"
               icon={<Clock />}
-            />
-          </div>
-
-          {/* Barra de Progresso */}
-          <div className="grid gap-6 md:grid-cols-1">
-            <ProgressCard
-              title="Consumo Mensal"
-              current={client.credits.used}
-              total={client.credits.total}
-              variant={usagePercentage >= 100 ? "destructive" : usagePercentage >= 85 ? "warning" : "default"}
             />
           </div>
 

@@ -16,7 +16,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { isAuthenticated, isAdmin } = useAuth();
+  const { isAuthenticated, isAdmin, isClient } = useAuth();
 
   return (
     <Routes>
@@ -28,7 +28,7 @@ function AppRoutes() {
         path="/" 
         element={
           <ProtectedRoute>
-            {isAdmin ? <AdminDashboard /> : <Inicio />}
+            {isAdmin ? <AdminDashboard /> : isClient ? <Inicio /> : <Inicio />}
           </ProtectedRoute>
         } 
       />

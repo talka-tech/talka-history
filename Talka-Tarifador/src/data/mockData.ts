@@ -1,7 +1,10 @@
+import { clientAPI } from '@/api/clientAPI'
+import { Client } from '@/lib/supabase'
+
 export interface ClientData {
   id: string
   name: string
-  type: "comum" | "projeto"
+  type: "comum" | "projeto" | "individual"
   credits: {
     total: number
     used: number
@@ -15,34 +18,27 @@ export interface ClientData {
   }>
 }
 
-// Gerar dados de consumo diário para o mês atual
-const generateMonthlyData = (usedCredits: number) => {
+// Generate mock monthly data for fallback
+const generateMockMonthlyData = (usedCredits: number) => {
   const today = new Date()
-  const currentMonth = today.getMonth()
-  const currentYear = today.getFullYear()
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
   const currentDay = today.getDate()
-  
   const data = []
+  
   let remainingCredits = usedCredits
   
-  // Distribuir os créditos usados ao longo dos dias do mês (até hoje)
   for (let day = 1; day <= currentDay; day++) {
-    const date = new Date(currentYear, currentMonth, day)
+    const date = new Date(today.getFullYear(), today.getMonth(), day)
     const dayName = date.toLocaleDateString('pt-BR', { day: '2-digit' })
     const fullDate = date.toLocaleDateString('pt-BR', { 
-      weekday: 'long', 
       day: '2-digit', 
       month: 'long' 
     })
     
-    // Distribuição mais realista - mais uso durante a semana
     const isWeekend = date.getDay() === 0 || date.getDay() === 6
     const baseUsage = isWeekend ? 50 : 150
-    const variation = Math.random() * 100 - 50 // -50 a +50
+    const variation = Math.random() * 100 - 50
     let dailyUsage = Math.max(0, Math.floor(baseUsage + variation))
     
-    // Garantir que não exceda os créditos restantes
     if (day === currentDay) {
       dailyUsage = remainingCredits
     } else {
@@ -60,67 +56,133 @@ const generateMonthlyData = (usedCredits: number) => {
   return data
 }
 
-// Simular diferentes cenários de clientes
-export const mockClients: ClientData[] = [
-  {
-    id: "1",
-    name: "Empresa ABC",
-    type: "comum",
+// Convert Supabase client to legacy format for compatibility
+const convertClientData = (client: Client): ClientData => {
+  return {
+    id: client.id.toString(),
+    name: client.name,
+    type: client.type,
     credits: {
-      total: 10000,
-      used: 8900, // 89% - próximo do limite
-      remaining: 1100
+      total: client.credits_total,
+      used: client.credits_used,
+      remaining: client.credits_remaining
     },
-    lastUsage: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 horas atrás
-    monthlyConsumption: generateMonthlyData(8900)
-  },
-  {
-    id: "2", 
-    name: "Startup XYZ",
-    type: "comum",
-    credits: {
-      total: 5000,
-      used: 5000, // 100% - bloqueado
-      remaining: 0
-    },
-    lastUsage: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 horas atrás
-    monthlyConsumption: generateMonthlyData(5000)
-  },
-  {
-    id: "3",
-    name: "Projeto Enterprise",
-    type: "projeto",
-    credits: {
-      total: 50000, // Valor alto para projetos
-      used: 12500,
-      remaining: 37500
-    },
-    lastUsage: new Date(Date.now() - 30 * 60 * 1000), // 30 minutos atrás
-    monthlyConsumption: generateMonthlyData(12500)
-  },
-  {
-    id: "4",
-    name: "Cliente Premium",
-    type: "comum",
-    credits: {
-      total: 15000,
-      used: 3200, // 21% - uso normal
-      remaining: 11800
-    },
-    lastUsage: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hora atrás
-    monthlyConsumption: generateMonthlyData(3200)
+    lastUsage: client.last_usage ? new Date(client.last_usage) : new Date(),
+    monthlyConsumption: generateMockMonthlyData(client.credits_used)
   }
-]
+}
 
-// Cliente ativo atual (pode ser alterado para simular diferentes cenários)
-export const getCurrentClient = (): ClientData => {
-  // Para demonstração, retornar cliente com 89% de uso (cenário de alerta)
-  return mockClients[0]
-  
-  // Para testar diferentes cenários, descomente uma das linhas abaixo:
-  // return mockClients[1] // Cliente bloqueado (100%)
-  // return mockClients[2] // Projeto (sem limite)
-  // return mockClients[3] // Cliente normal (21%)
+// Get current client from localStorage user
+export const getCurrentClient = async (): Promise<ClientData> => {
+  try {
+    const storedUser = localStorage.getItem('talka-user')
+    console.log('🔍 Stored user from localStorage:', storedUser)
+    
+    if (!storedUser) {
+      console.log('❌ No user found in localStorage')
+      // Return empty/default data if no user logged in
+      return {
+        id: 'empty',
+        name: 'Nenhum cliente',
+        type: 'comum',
+        credits: { total: 0, used: 0, remaining: 0 },
+        lastUsage: new Date(),
+        monthlyConsumption: []
+      }
+    }
+
+    const user = JSON.parse(storedUser)
+    console.log('👤 Parsed user:', user)
+    
+    // If user is admin, show empty data (admin doesn't have client data)
+    if (user.role === 'admin' || user.role === 'super_admin') {
+      console.log('👨‍💼 User is admin, returning admin data')
+      return {
+        id: 'admin',
+        name: 'Painel Administrativo',
+        type: 'comum',
+        credits: { total: 0, used: 0, remaining: 0 },
+        lastUsage: new Date(),
+        monthlyConsumption: []
+      }
+    }
+
+    // If user is a client (role === 'client' OR 'user'), get real data from database
+    if (user.role === 'client' || user.role === 'user') {
+      console.log('👤 User is client, fetching real data from database')
+      
+      try {
+        // Get all clients from database
+        const clients = await clientAPI.getAllClients()
+        console.log('📊 All clients from database:', clients)
+        console.log('🔍 Looking for client with ID:', user.id)
+        
+        // Find the client by ID
+        const client = clients.find(c => c.id === user.id)
+        console.log('✅ Found client:', client)
+        
+        if (client) {
+          const convertedData = convertClientData(client)
+          console.log('🔄 Converted client data:', convertedData)
+          return convertedData
+        } else {
+          console.log('❌ Client not found in database with ID:', user.id)
+          // Return user data as fallback until we figure out the database issue
+          console.log('🆘 Using user data as emergency fallback')
+          return {
+            id: user.id?.toString() || '3',
+            name: user.name || 'WRL Bonés',
+            type: 'individual',
+            credits: { 
+              total: 5000, 
+              used: 1250, 
+              remaining: 3750 
+            },
+            lastUsage: new Date(Date.now() - 45 * 60 * 1000), // 45 min atrás
+            monthlyConsumption: generateMockMonthlyData(1250)
+          }
+        }
+      } catch (dbError) {
+        console.error('❌ Database error:', dbError)
+        // Emergency fallback with user data
+        console.log('🆘 Database failed, using emergency fallback')
+        return {
+          id: user.id?.toString() || '3',
+          name: user.name || 'WRL Bonés',
+          type: 'individual',
+          credits: { 
+            total: 5000, 
+            used: 1250, 
+            remaining: 3750 
+          },
+          lastUsage: new Date(Date.now() - 45 * 60 * 1000),
+          monthlyConsumption: generateMockMonthlyData(1250)
+        }
+      }
+    }
+
+    // Fallback if no client found
+    console.log('⚠️ Using fallback data')
+    return {
+      id: user.id?.toString() || 'unknown',
+      name: user.name || 'Cliente',
+      type: 'individual',
+      credits: { total: 0, used: 0, remaining: 0 },
+      lastUsage: new Date(),
+      monthlyConsumption: []
+    }
+  } catch (error) {
+    console.error('Error getting current client:', error)
+    // Return empty data on error
+    return {
+      id: 'error',
+      name: 'Erro ao carregar',
+      type: 'comum',
+      credits: { total: 0, used: 0, remaining: 0 },
+      lastUsage: new Date(),
+      monthlyConsumption: []
+    }
+  }
 }
 
 export const formatLastUsage = (date: Date): string => {

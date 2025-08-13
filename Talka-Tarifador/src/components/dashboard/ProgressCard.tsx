@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
+import { TriangleAlert } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ProgressCardProps {
@@ -9,6 +11,9 @@ interface ProgressCardProps {
   unit?: string
   showPercentage?: boolean
   variant?: "default" | "warning" | "destructive"
+  showAlert?: boolean
+  alertType?: "warning" | "blocked"
+  onUpgrade?: () => void
 }
 
 export function ProgressCard({
@@ -17,7 +22,10 @@ export function ProgressCard({
   total,
   unit = "créditos",
   showPercentage = true,
-  variant = "default"
+  variant = "default",
+  showAlert = false,
+  alertType = "warning",
+  onUpgrade
 }: ProgressCardProps) {
   const percentage = Math.round((current / total) * 100)
   
@@ -81,6 +89,50 @@ export function ProgressCard({
               <span className="text-muted-foreground">
                 {(total - current).toLocaleString('pt-BR')} restantes
               </span>
+            </div>
+          )}
+
+          {/* Alerta integrado - mais discreto e em baixo */}
+          {showAlert && (
+            <div className={cn(
+              "mt-4 p-3 rounded-md border border-dashed flex items-start gap-2",
+              alertType === "warning" 
+                ? "bg-warning/5 border-warning/20"
+                : "bg-destructive/5 border-destructive/20"
+            )}>
+              <TriangleAlert className={cn(
+                "h-3.5 w-3.5 mt-0.5 flex-shrink-0 opacity-70",
+                alertType === "warning" ? "text-warning" : "text-destructive"
+              )} />
+              <div className="space-y-2 flex-1">
+                <p className={cn(
+                  "font-medium text-xs",
+                  alertType === "warning" ? "text-warning" : "text-destructive"
+                )}>
+                  {alertType === "warning" ? "Atenção: Limite Próximo" : "Limite Excedido"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {alertType === "warning" 
+                    ? "Você utilizou a maior parte dos seus créditos mensais. Considere fazer upgrade do seu plano."
+                    : "Você excedeu o limite de créditos. Faça upgrade para continuar usando os serviços."
+                  }
+                </p>
+                {onUpgrade && (
+                  <Button 
+                    size="sm" 
+                    onClick={onUpgrade}
+                    variant="outline"
+                    className={cn(
+                      "mt-2 text-xs h-7 px-3 border-dashed",
+                      alertType === "warning" 
+                        ? "text-warning border-warning/30 hover:bg-warning/10"
+                        : "text-destructive border-destructive/30 hover:bg-destructive/10"
+                    )}
+                  >
+                    Fazer Upgrade
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
