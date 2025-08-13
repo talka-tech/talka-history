@@ -1,16 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-
-interface User {
-  id: string
-  name: string
-  email: string
-  company: string
-}
+import { apiClient } from '@/api'
+import { User } from '@/api/userData'
 
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<boolean>
+  isAdmin: boolean
+  login: (username: string, password: string) => Promise<boolean>
   logout: () => void
   isLoading: boolean
 }
@@ -24,45 +20,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Verificar se há um usuário salvo no localStorage
     const savedUser = localStorage.getItem('talka-user')
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    const savedToken = localStorage.getItem('talka-token')
+    
+    if (savedUser && savedToken) {
+      const parsedUser = JSON.parse(savedUser)
+      setUser(parsedUser)
+      apiClient.setToken(savedToken)
     }
     setIsLoading(false)
   }, [])
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true)
     
-    // Simulação de login - em produção, fazer chamada para API
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Credenciais de demonstração
-    if (email === 'admin@talka.com.br' && password === '123456') {
-      const mockUser: User = {
-        id: '1',
-        name: 'Administrador TALKA',
-        email: 'admin@talka.com.br',
-        company: 'TALKA Technologies'
-      }
+    try {
+      const response = await apiClient.auth.login({ email: username, password })
       
-      setUser(mockUser)
-      localStorage.setItem('talka-user', JSON.stringify(mockUser))
-      setIsLoading(false)
-      return true
-    }
-    
-    if (email === 'cliente@empresa.com.br' && password === '123456') {
-      const mockUser: User = {
-        id: '2',
-        name: 'João Silva',
-        email: 'cliente@empresa.com.br',
-        company: 'Empresa Demo Ltda'
+      if (response.success && response.user && response.token) {
+        setUser(response.user)
+        localStorage.setItem('talka-user', JSON.stringify(response.user))
+        apiClient.setToken(response.token)
+        setIsLoading(false)
+        return true
       }
-      
-      setUser(mockUser)
-      localStorage.setItem('talka-user', JSON.stringify(mockUser))
-      setIsLoading(false)
-      return true
+    } catch (error) {
+      console.error('Login error:', error)
     }
     
     setIsLoading(false)
@@ -72,12 +54,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null)
     localStorage.removeItem('talka-user')
+    apiClient.removeToken()
   }
+
+  const isAdmin = user?.role === 'admin'
 
   return (
     <AuthContext.Provider value={{
       user,
       isAuthenticated: !!user,
+      isAdmin,
       login,
       logout,
       isLoading

@@ -1,4 +1,4 @@
-import { BarChart3, Settings, Menu, Home, LogOut, User } from "lucide-react"
+import { BarChart3, Settings, Menu, Home, LogOut, User, Users, Shield } from "lucide-react"
 import { NavLink } from "react-router-dom"
 import {
   Sidebar,
@@ -16,29 +16,46 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
 import { getCurrentClient } from "@/data/mockData"
 
-const navigation = [
-  {
-    title: "Início",
-    url: "/",
-    icon: Home,
-  },
-  {
-    title: "Dashboard BI",
-    url: "/dashboard",
-    icon: BarChart3,
-  },
-  {
-    title: "Configurações",
-    url: "/configuracoes",
-    icon: Settings,
-  },
-]
-
 export function AppSidebar() {
   const { state } = useSidebar()
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const collapsed = state === "collapsed"
   const client = getCurrentClient()
+
+  // Navigation items based on user role
+  const navigation = isAdmin ? [
+    {
+      title: "Painel Admin",
+      url: "/",
+      icon: Shield,
+    },
+    {
+      title: "Gerenciar Usuários",
+      url: "/admin",
+      icon: Users,
+    },
+    {
+      title: "Configurações",
+      url: "/configuracoes",
+      icon: Settings,
+    },
+  ] : [
+    {
+      title: "Início",
+      url: "/",
+      icon: Home,
+    },
+    {
+      title: "Dashboard BI",
+      url: "/dashboard",
+      icon: BarChart3,
+    },
+    {
+      title: "Configurações",
+      url: "/configuracoes",
+      icon: Settings,
+    },
+  ]
 
   return (
     <Sidebar className="border-card-border bg-card/50 backdrop-blur-sm">
@@ -61,13 +78,26 @@ export function AppSidebar() {
         {!collapsed && user && (
           <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/20 backdrop-blur-sm">
             <div className="flex items-center gap-2 mb-2">
-              <div className="h-6 w-6 rounded-full bg-accent/20 flex items-center justify-center">
-                <User className="h-3 w-3 text-accent" />
+              <div className={`h-6 w-6 rounded-full ${isAdmin ? 'bg-orange-500/20' : 'bg-accent/20'} flex items-center justify-center`}>
+                {isAdmin ? (
+                  <Shield className="h-3 w-3 text-orange-500" />
+                ) : (
+                  <User className="h-3 w-3 text-accent" />
+                )}
               </div>
-              <p className="text-xs font-medium text-muted-foreground">Bem-vindo(a)</p>
+              <p className="text-xs font-medium text-muted-foreground">
+                {isAdmin ? 'Administrador' : 'Bem-vindo(a)'}
+              </p>
             </div>
             <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
             <p className="text-xs text-muted-foreground truncate">{user.company}</p>
+            {isAdmin && (
+              <div className="mt-2">
+                <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                  Acesso Total
+                </span>
+              </div>
+            )}
           </div>
         )}
       </SidebarHeader>

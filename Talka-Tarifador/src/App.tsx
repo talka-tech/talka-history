@@ -9,13 +9,14 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Inicio from "./pages/Inicio";
 import Dashboard from "./pages/Dashboard";
 import Configuracoes from "./pages/Configuracoes";
+import AdminDashboard from "./pages/AdminDashboard";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
 
   return (
     <Routes>
@@ -27,7 +28,7 @@ function AppRoutes() {
         path="/" 
         element={
           <ProtectedRoute>
-            <Inicio />
+            {isAdmin ? <AdminDashboard /> : <Inicio />}
           </ProtectedRoute>
         } 
       />
@@ -36,6 +37,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin" 
+        element={
+          <ProtectedRoute>
+            {isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />}
           </ProtectedRoute>
         } 
       />
