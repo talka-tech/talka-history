@@ -890,7 +890,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                                Talka Analytics
+                                Talka History
                             </h1>
                             <p className="text-xs text-purple-300/80">Análise Inteligente de Conversas</p>
                         </div>

@@ -1,73 +1,235 @@
-# Welcome to your Lovable project
+# Talka History 📊
 
-## Project info
+**Plataforma Inteligente de Análise de Conversas WhatsApp**
 
-**URL**: https://lovable.dev/projects/a5394b15-2cb3-4112-b108-5903a2e56c61
+![Talka History](public/img/logo.png)
 
-## How can I edit this code?
+## 🎯 Visão Geral
 
-There are several ways of editing your application.
+O **Talka History** é uma solução empresarial avançada para análise e gerenciamento de históricos de conversas do WhatsApp. Desenvolvido para empresas que precisam processar, analisar e extrair insights de grandes volumes de dados de comunicação.
 
-**Use Lovable**
+### 🚀 Principais Funcionalidades
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a5394b15-2cb3-4112-b108-5903a2e56c61) and start prompting.
+- **📈 Processamento de Dados em Escala**: Suporte para mais de 11.000 conversas com sistema híbrido de carregamento
+- **🔍 Busca Inteligente**: Sistema de busca dupla com indexação por título e normalização numérica
+- **⚡ Performance Otimizada**: Carregamento inicial de 100 conversas com paginação visual + busca individual em todo o dataset
+- **🗜️ Compressão Automática**: Sistema de compressão com Pako para uploads até 80% menores
+- **📊 Interface Responsiva**: Dashboard moderno com tema dark e gradientes corporativos
+- **🔐 Autenticação Segura**: Sistema de login com controle de usuários por empresa
+- **📅 Filtros Avançados**: Filtros por data com presets rápidos (hoje, 7 dias, 30 dias, 1 ano)
+- **🗑️ Gerenciamento Completo**: Exclusão de conversas individuais e mensagens específicas
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🏗️ Arquitetura Técnica
 
-**Use your preferred IDE**
+### Frontend
+- **React 18** com TypeScript
+- **Vite** para build otimizado
+- **Tailwind CSS** para estilização
+- **shadcn/ui** para componentes
+- **Zustand** para gerenciamento de estado
+- **React Hook Form** para formulários
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Backend & Database
+- **Supabase** como Backend-as-a-Service
+- **PostgreSQL** para banco de dados relacional
+- **Edge Functions** para APIs serverless
+- **Row Level Security (RLS)** para segurança
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Processamento de Dados
+- **Pako** para compressão de arquivos
+- **CSV Parser** customizado para WhatsApp exports
+- **Sistema Híbrido** de busca e carregamento
+- **Normalização automática** de números de telefone
 
-Follow these steps:
+## 📋 Funcionalidades Detalhadas
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 1. Sistema Híbrido de Carregamento
+```
+📊 Carregamento Padrão: 100 conversas mais recentes (10 páginas de 10)
+🔍 Busca Individual: Acesso a todas as 11k+ conversas via API dedicada
+⚡ Performance: Carregamento rápido + busca completa quando necessário
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2. Upload Inteligente de CSV
+- **Validação automática** de estrutura CSV
+- **Compressão em tempo real** com Pako
+- **Processamento frontend** para máxima velocidade
+- **Progress tracking** visual durante upload
+- **Suporte a arquivos grandes** (testado com datasets de 11k+ conversas)
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 3. Busca Avançada
+- **Busca por título**: Matching direto em nomes/títulos
+- **Busca numérica**: Normalização automática de números (81) 8195-3019 → 818195
+- **Debounce inteligente**: 500ms para otimizar performance
+- **Resultados em tempo real**: Feedback visual instantâneo
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### 4. Interface Moderna
+- **Design System** consistente com gradientes corporativos
+- **Tema Dark** otimizado para longas sessões de trabalho
+- **Componentes modulares** com shadcn/ui
+- **Responsive design** para desktop e mobile
+- **Loading states** e feedback visual completo
+
+## 🛠️ Instalação e Configuração
+
+### Pré-requisitos
+- Node.js 18+ 
+- npm ou yarn
+- Conta Supabase configurada
+
+### Configuração Local
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/talka-tech/talka-produtos.git
+cd talka-produtos/Talka-Historico
+
+# 2. Instale as dependências
+npm install
+
+# 3. Configure as variáveis de ambiente
+cp .env.example .env.local
+# Edite .env.local com suas credenciais Supabase
+
+# 4. Execute o servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Variáveis de Ambiente Necessárias
+```env
+NEXT_PUBLIC_SUPABASE_URL=sua_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_anon_key
+SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📊 Estrutura do Banco de Dados
 
-**Use GitHub Codespaces**
+### Tabelas Principais
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+**`users`**
+```sql
+- id (bigint, primary key)
+- username (text, unique)
+- password_hash (text)
+- created_at (timestamp)
+- status (text, default: 'active')
+```
 
-## What technologies are used for this project?
+**`conversations`**
+```sql
+- id (text, primary key)
+- title (text)
+- user_id (bigint, foreign key)
+- created_at (timestamp)
+- updated_at (timestamp)
+```
 
-This project is built with:
+**`messages`**
+```sql
+- id (text, primary key)
+- conversation_id (text, foreign key)
+- timestamp (timestamp)
+- sender (text)
+- content (text)
+- fromMe (boolean)
+- created_at (timestamp)
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🔧 APIs Disponíveis
 
-## How can I deploy this project?
+### Autenticação
+- `POST /api/login` - Login de usuário
+- `POST /api/create-user` - Criação de usuário
+- `PUT /api/update-user-password` - Atualização de senha
 
-Simply open [Lovable](https://lovable.dev/projects/a5394b15-2cb3-4112-b108-5903a2e56c61) and click on Share -> Publish.
+### Conversas
+- `GET /api/conversations` - Lista primeiras 100 conversas
+- `GET /api/search-conversations` - Busca em todas as conversas
+- `GET /api/total-conversations` - Count total de conversas
+- `DELETE /api/delete-conversation` - Remove conversa específica
+- `DELETE /api/delete-message` - Remove mensagem específica
 
-## Can I connect a custom domain to my Lovable project?
+### Upload e Processamento
+- `POST /api/upload-csv-compressed` - Upload com compressão
+- `POST /api/clear-data-supabase` - Limpeza de dados
 
-Yes, you can!
+### Administração
+- `GET /api/admin-metrics` - Métricas administrativas
+- `POST /api/create-admin` - Criação de admin
+- `GET /api/users` - Listagem de usuários
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🚀 Deploy em Produção
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Vercel (Recomendado)
+```bash
+# 1. Conecte o repositório no Vercel
+# 2. Configure as variáveis de ambiente
+# 3. Deploy automático via Git
+
+# Ou via CLI:
+npm i -g vercel
+vercel --prod
+```
+
+### Docker
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+## 📈 Métricas e Performance
+
+### Benchmarks Atuais
+- **Carregamento inicial**: ~500ms para 100 conversas
+- **Busca individual**: ~1-2s para busca em 11k+ conversas
+- **Upload CSV**: ~30s para 11k conversas (com compressão)
+- **Compressão**: Até 80% de redução no tamanho
+
+### Otimizações Implementadas
+- **Lazy loading** de mensagens
+- **Debounce** em buscas
+- **Compressão Pako** para uploads
+- **Edge Functions** para APIs
+- **Indexação** otimizada no Supabase
+
+## 🔐 Segurança
+
+- **Row Level Security (RLS)** no Supabase
+- **Hash bcrypt** para senhas
+- **Validação** de inputs em todas as APIs
+- **CORS** configurado adequadamente
+- **Rate limiting** em endpoints sensíveis
+
+## 🤝 Contribuição
+
+### Padrões de Código
+- **TypeScript** strict mode
+- **ESLint** + **Prettier** configurados
+- **Conventional commits** para mensagens
+- **Component-first** architecture
+
+### Processo de Desenvolvimento
+1. Crie uma branch: `git checkout -b feature/nova-funcionalidade`
+2. Commit suas mudanças: `git commit -m 'feat: adiciona nova funcionalidade'`
+3. Push para branch: `git push origin feature/nova-funcionalidade`
+4. Abra um Pull Request
+
+## 📞 Suporte
+
+- **Email**: suporte@talka.tech
+- **Documentação**: [docs.talka.tech](https://docs.talka.tech)
+- **Issues**: [GitHub Issues](https://github.com/talka-tech/talka-produtos/issues)
+
+## 📄 Licença
+
+Copyright © 2025 Talka Tech. Todos os direitos reservados.
+
+---
+
+**Desenvolvido com ❤️ pela equipe Talka Tech**
