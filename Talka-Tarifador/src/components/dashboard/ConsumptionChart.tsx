@@ -28,10 +28,13 @@ export function ConsumptionChart({ data, cardColor }: ConsumptionChartProps) {
     return null
   }
 
+  // Deixa o fundo mais claro e borda mais visível
+  const bg = cardColor ? cardColor.replace(/10|20|22|30|40|50|60|70|80|90|A0|B0|C0|D0|E0|F0/g, '22') : undefined;
+  const border = cardColor ? cardColor.replace(/10|20|22|30|40|50|60|70|80|90|A0|B0|C0|D0|E0|F0/g, '99') : undefined;
   return (
     <Card
       className="col-span-full transition-all duration-300 hover:shadow-elegant animate-fade-in"
-      style={cardColor ? { background: cardColor } : {}}
+      style={cardColor ? { background: bg, borderColor: border } : {}}
     >
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-foreground">

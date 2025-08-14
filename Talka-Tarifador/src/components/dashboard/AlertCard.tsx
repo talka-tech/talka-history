@@ -54,11 +54,18 @@ export function AlertCard({ type, percentage, clientType, onUpgrade }: AlertCard
     success: "text-success"
   }
 
+  // Harmoniza fundo e borda para cor do cliente mais evidente
+  // (usa cor do cliente se disponível via CSS var, senão mantém o padrão)
+  const clientColor = typeof window !== 'undefined' ? getComputedStyle(document.body).getPropertyValue('--client-primary') : '';
+  const bg = clientColor ? clientColor.trim() + '22' : undefined;
+  const border = clientColor ? clientColor.trim() + '99' : undefined;
   return (
     <Card className={cn(
       "transition-all duration-300 animate-slide-up",
       variantStyles[config.variant]
-    )}>
+    )}
+      style={clientColor ? { background: bg, borderColor: border } : {}}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
           <Icon className={cn("h-5 w-5", iconStyles[config.variant])} />

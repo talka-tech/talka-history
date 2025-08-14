@@ -34,6 +34,9 @@ export function MetricCard({
     destructive: "border-destructive/20 bg-gradient-to-br from-destructive/5 to-destructive/10"
   }
 
+  // Deixa o fundo mais claro e borda mais visível
+  const bg = cardColor ? cardColor.replace(/10|20|22|30|40|50|60|70|80|90|A0|B0|C0|D0|E0|F0/g, '22') : undefined;
+  const border = cardColor ? cardColor.replace(/10|20|22|30|40|50|60|70|80|90|A0|B0|C0|D0|E0|F0/g, '99') : undefined;
   return (
     <Card
       className={cn(
@@ -41,7 +44,7 @@ export function MetricCard({
         variantStyles[variant],
         className
       )}
-      style={cardColor ? { background: cardColor } : {}}
+      style={cardColor ? { background: bg, borderColor: border } : {}}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">

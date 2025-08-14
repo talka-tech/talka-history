@@ -24,27 +24,38 @@ export function Layout({ children }: LayoutProps) {
     <SidebarProvider>
       <div
         className="min-h-screen flex w-full"
-        style={clientColor ? { background: `linear-gradient(135deg, ${clientColor}10 0%, #18181b 100%)` } : {}}
+        style={{ background: '#151518' }}
       >
         <AppSidebar />
         <div className="flex-1 flex flex-col">
           <header
             className="h-16 border-b border-card-border/50 flex items-center px-6 shadow-sm"
-            style={Object.assign({}, headerBg ? { background: headerBg } : {}, clientColor ? { ['--icon-color']: clientColor } : {})}
+            style={Object.assign({ background: '#151518' }, clientColor ? { ['--icon-color']: clientColor } : {})}
           >
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 group"
               asChild
             >
               <SidebarTrigger>
                 <Menu
-                  className={"h-4 w-4" + (clientColor ? "" : " text-muted-foreground")}
+                  className="h-4 w-4"
                   style={clientColor ? { color: clientColor } : undefined}
                 />
               </SidebarTrigger>
             </Button>
+            {clientColor && (
+              <style>{`
+                .h-8.w-8.group:hover {
+                  background: ${clientColor}22 !important;
+                }
+                .h-8.w-8.group:hover .h-4.w-4,
+                .h-8.w-8.group:focus .h-4.w-4 {
+                  color: ${clientColor} !important;
+                }
+              `}</style>
+            )}
             <div className="ml-4 flex-1">
               <h2
                 className="text-lg font-semibold"

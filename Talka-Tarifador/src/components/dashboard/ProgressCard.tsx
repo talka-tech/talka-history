@@ -47,19 +47,23 @@ export function ProgressCard({
     destructive: "border-destructive/30 bg-gradient-to-br from-destructive/5 to-destructive/10 shadow-destructive/20 animate-pulse-glow"
   }
 
+  // Torna a barra de progresso transparente
   const progressVariants = {
-    default: "bg-[color:var(--client-primary,theme(colors.accent.DEFAULT))]",
-    warning: "bg-warning",
-    destructive: "bg-destructive"
+    default: "bg-transparent",
+    warning: "bg-transparent",
+    destructive: "bg-transparent"
   }
 
+  // Deixa o fundo mais claro e borda mais visível
+  const bg = cardColor ? cardColor.replace(/10|20|22|30|40|50|60|70|80|90|A0|B0|C0|D0|E0|F0/g, '22') : undefined;
+  const border = cardColor ? cardColor.replace(/10|20|22|30|40|50|60|70|80|90|A0|B0|C0|D0|E0|F0/g, '99') : undefined;
   return (
     <Card
       className={cn(
         "transition-all duration-300 hover:shadow-elegant animate-fade-in",
         variantStyles[currentVariant]
       )}
-      style={cardColor ? { background: cardColor } : {}}
+      style={cardColor ? { background: bg, borderColor: border } : {}}
     >
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium text-muted-foreground">
