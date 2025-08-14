@@ -26,8 +26,17 @@ class ClientAPI {
     
     try {
       const { data: clients, error } = await supabase
-        .from('clients_with_products')
-        .select('*')
+        .from('clients')
+        .select(`
+          *,
+          talka_products!clients_product_id_fkey (
+            id,
+            name,
+            description,
+            color,
+            logo_url
+          )
+        `)
         .order('id', { ascending: true })
 
       if (error) {
@@ -35,8 +44,15 @@ class ClientAPI {
         throw error
       }
 
-      console.log('📊 Fetched clients from database:', clients?.length || 0)
-      return clients || []
+      // Transform data to include product_name for compatibility
+      const transformedClients = clients?.map(client => ({
+        ...client,
+        product_name: client.talka_products?.name || 'Talka Geral',
+        product: client.talka_products?.name || 'Talka Geral'
+      })) || []
+
+      console.log('📊 Fetched clients from database:', transformedClients?.length || 0)
+      return transformedClients
     } catch (error) {
       console.error('Error in getAllClients:', error)
       throw error

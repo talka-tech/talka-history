@@ -5,9 +5,10 @@ interface AdminChartsProps {
   revenueData: { month: string; revenue: number }[]
   usageData: { month: string; usage: number }[]
   userDistribution: { name: string; value: number; color: string }[]
+  primaryColor?: string // Nova prop para cor primária dos gráficos
 }
 
-export function AdminCharts({ revenueData, usageData, userDistribution }: AdminChartsProps) {
+export function AdminCharts({ revenueData, usageData, userDistribution, primaryColor = "hsl(var(--accent))" }: AdminChartsProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -37,7 +38,7 @@ export function AdminCharts({ revenueData, usageData, userDistribution }: AdminC
               <XAxis dataKey="month" />
               <YAxis tickFormatter={formatCurrency} />
               <Tooltip formatter={(value) => formatCurrency(value as number)} />
-              <Bar dataKey="revenue" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="revenue" fill={primaryColor} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -92,9 +93,9 @@ export function AdminCharts({ revenueData, usageData, userDistribution }: AdminC
               <Line 
                 type="monotone" 
                 dataKey="usage" 
-                stroke="hsl(var(--accent))" 
+                stroke={primaryColor} 
                 strokeWidth={3}
-                dot={{ fill: "hsl(var(--accent))", strokeWidth: 2, r: 4 }}
+                dot={{ fill: primaryColor, strokeWidth: 2, r: 4 }}
               />
             </LineChart>
           </ResponsiveContainer>

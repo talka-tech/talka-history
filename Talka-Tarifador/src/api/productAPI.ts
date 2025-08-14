@@ -58,14 +58,22 @@ export const getProductsWithMetrics = async (): Promise<{ success: boolean; data
     // Buscar métricas para cada produto
     const productsWithMetrics = await Promise.all(
       products.map(async (product) => {
-        const { data: metrics } = await supabase
-          .rpc('calculate_product_metrics', { product_id_param: product.id })
+        // Buscar clientes do produto
+        const { data: clients } = await supabase
+          .from('clients')
+          .select('id, credits_total, credits_used, is_active')
+          .eq('product_id', product.id)
+
+        const productClients = clients || []
+        const activeClients = productClients.filter(c => c.is_active).length
+        const totalCreditsUsed = productClients.reduce((sum, c) => sum + (c.credits_used || 0), 0)
+        const totalRevenue = productClients.reduce((sum, c) => sum + ((c.credits_total || 0) * 0.001), 0)
 
         const productMetrics: ProductMetrics = {
-          total_clients: metrics?.[0]?.total_clients || 0,
-          active_clients: metrics?.[0]?.active_clients || 0,
-          credits_used: metrics?.[0]?.total_credits_used || 0,
-          revenue: metrics?.[0]?.total_revenue || 0
+          total_clients: productClients.length,
+          active_clients: activeClients,
+          credits_used: totalCreditsUsed,
+          revenue: totalRevenue
         }
 
         return {
@@ -87,6 +95,7 @@ export const getProductsWithMetrics = async (): Promise<{ success: boolean; data
 
 // Criar novo produto
 export const createProduct = async (productData: {
+  id?: string
   name: string
   description: string
   color: string
@@ -99,7 +108,16 @@ export const createProduct = async (productData: {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      // Se o produto já existe, isso é ok para os produtos padrão
+      if (error.code === '23505') { // Unique constraint violation
+        return { 
+          success: false, 
+          error: 'Produto já existe' 
+        }
+      }
+      throw error
+    }
 
     return { success: true, data }
   } catch (error) {
@@ -208,8 +226,17 @@ export const toggleProductStatus = async (id: string): Promise<{ success: boolea
 export const getProductClients = async (productId: string): Promise<{ success: boolean; data?: any[]; error?: string }> => {
   try {
     const { data, error } = await supabase
-      .from('clients_with_products')
-      .select('*')
+      .from('clients')
+      .select(`
+        *,
+        talka_products!clients_product_id_fkey (
+          id,
+          name,
+          description,
+          color,
+          logo_url
+        )
+      `)
       .eq('product_id', productId)
       .order('created_at', { ascending: false })
 
