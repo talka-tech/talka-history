@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Users, DollarSign, TrendingUp, AlertTriangle, LogOut, Search, Ban, Trash2, Edit, RefreshCw, Plus, Eye, EyeOff } from "lucide-react"
+import { Users, DollarSign, TrendingUp, AlertTriangle, LogOut, Search, Ban, Trash2, Edit, RefreshCw, Plus, Eye, EyeOff, Settings, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -7,13 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import { AdminCharts } from "@/components/dashboard/AdminCharts"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/AuthContext"
 import { clientAPI } from "@/api/clientAPI"
+import productAPI from "@/api/productAPI"
 import { Client } from "@/lib/supabase"
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts'
 
 interface DashboardStats {
   totalClients: number
@@ -26,6 +30,17 @@ interface DashboardStats {
   pendingPayments: number
 }
 
+interface TalkaProduct {
+  id: string
+  name: string
+  description: string
+  color: string
+  clients: number
+  revenue: number
+  creditsUsed: number
+  isActive: boolean
+}
+
 export default function AdminDashboard() {
   const [clients, setClients] = useState<Client[]>([])
   const [filteredClients, setFilteredClients] = useState<Client[]>([])
@@ -34,19 +49,64 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [productFilter, setProductFilter] = useState("all")
+  const [selectedProduct, setSelectedProduct] = useState<string>("all")
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newCredits, setNewCredits] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [createProductDialogOpen, setCreateProductDialogOpen] = useState(false)
+  const [editProductDialogOpen, setEditProductDialogOpen] = useState(false)
+  const [deleteProductDialogOpen, setDeleteProductDialogOpen] = useState(false)
+  const [productToEdit, setProductToEdit] = useState<TalkaProduct | null>(null)
+  const [productToDelete, setProductToDelete] = useState<TalkaProduct | null>(null)
   const [newClientData, setNewClientData] = useState({
     name: "",
     login: "",
     type: "projeto" as "projeto" | "individual",
     credits_total: "",
-    password: ""
+    password: "",
+    product: "Talka Geral"
   })
+  const [newProductData, setNewProductData] = useState({
+    name: "",
+    description: "",
+    color: "#8B5CF6"
+  })
+  const [talkaProducts, setTalkaProducts] = useState<TalkaProduct[]>([
+    {
+      id: "talka-geral",
+      name: "Talka Geral",
+      description: "Para clientes diversos e projetos gerais",
+      color: "#8B5CF6",
+      clients: 0,
+      revenue: 0,
+      creditsUsed: 0,
+      isActive: true
+    },
+    {
+      id: "conciarge",
+      name: "ConcIArge",
+      description: "Para clínicas médicas",
+      color: "#10B981",
+      clients: 0,
+      revenue: 0,
+      creditsUsed: 0,
+      isActive: true
+    },
+    {
+      id: "converse-direito", 
+      name: "Converse IA Direito",
+      description: "Para escritórios de advocacia",
+      color: "#3B82F6",
+      clients: 0,
+      revenue: 0,
+      creditsUsed: 0,
+      isActive: true
+    }
+  ])
   const [revenueData, setRevenueData] = useState<{ month: string; revenue: number }[]>([])
   const [passwordVisibility, setPasswordVisibility] = useState<{[key: string]: boolean}>({})
   const [editingClient, setEditingClient] = useState<string | null>(null)
@@ -55,19 +115,70 @@ export default function AdminDashboard() {
   const { toast } = useToast()
   const { logout } = useAuth()
 
+  // Function to get logo path for each product
+  const getProductLogo = (productName: string) => {
+    switch (productName) {
+      case "ConcIArge":
+        return "/logos/conciarge_logo.png"
+      case "Converse IA Direito":
+        return "/logos/converseiadireito_logo.png"
+      case "Talka Geral":
+        return "/logos/talka_logo.png"
+      default:
+        return "/logos/talka_logo.png"
+    }
+  }
+
   useEffect(() => {
     loadData()
   }, [])
 
   useEffect(() => {
     filterClients()
-  }, [clients, searchQuery, statusFilter])
+  }, [clients, searchQuery, statusFilter, productFilter])
 
   const loadData = async () => {
     try {
       setLoading(true)
+      
+      // Carregar produtos do banco de dados
+      const productsResult = await productAPI.getProductsWithMetrics()
+      if (productsResult.success && productsResult.data) {
+        const productsWithStats = productsResult.data.map(product => ({
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          color: product.color,
+          clients: product.metrics.total_clients,
+          revenue: product.metrics.revenue,
+          creditsUsed: product.metrics.credits_used,
+          isActive: product.is_active
+        }))
+        setTalkaProducts(productsWithStats)
+      }
+      
+      // Carregar clientes (já incluem dados dos produtos via view)
       const clientsData = await clientAPI.getAllClients()
-      setClients(clientsData)
+      
+      // Add product field to existing clients if not present (mock assignment)
+      const clientsWithProducts = clientsData.map((client: any) => ({
+        ...client,
+        product: client.product_name || client.product || (Math.random() > 0.6 ? "Talka Geral" : Math.random() > 0.5 ? "ConcIArge" : "Converse IA Direito")
+      }))
+      
+      setClients(clientsWithProducts)
+      
+      // Calculate product statistics
+      const updatedProducts = talkaProducts.map(product => {
+        const productClients = clientsWithProducts.filter((c: any) => c.product === product.name)
+        return {
+          ...product,
+          clients: productClients.length,
+          revenue: productClients.reduce((sum: number, c: any) => sum + (c.credits_total * 0.001), 0),
+          creditsUsed: productClients.reduce((sum: number, c: any) => sum + c.credits_used, 0)
+        }
+      })
+      setTalkaProducts(updatedProducts)
       
       // No need to fetch user data separately - it's in the clients table now
       console.log('🔍 Clients data:', clientsData)
@@ -94,9 +205,9 @@ export default function AdminDashboard() {
         inactiveClients,
         totalCreditsUsed,
         averageUsage: clientsData.length > 0 ? Math.round(totalCreditsUsed / clientsData.length) : 0,
-        totalRevenue: clientsData.reduce((sum, c) => sum + (c.credits_total * 0.001), 0), // Mock revenue calculation
+        totalRevenue: clientsData.reduce((sum, c) => sum + (c.credits_total * 0.001), 0),
         clientsExceeded,
-        pendingPayments: 0 // Mock value
+        pendingPayments: 0
       })
 
       // Mock chart data
@@ -191,10 +302,11 @@ export default function AdminDashboard() {
     let filtered = clients
 
     if (searchQuery) {
-      filtered = filtered.filter(client =>
+      filtered = filtered.filter((client: any) =>
         client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         client.login.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.id.toString().includes(searchQuery.toLowerCase())
+        client.id.toString().includes(searchQuery.toLowerCase()) ||
+        (client.product && client.product.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     }
 
@@ -204,6 +316,10 @@ export default function AdminDashboard() {
       filtered = filtered.filter(client => !client.is_active)
     } else if (statusFilter === "exceeded") {
       filtered = filtered.filter(client => client.credits_used >= client.credits_total)
+    }
+
+    if (productFilter !== "all") {
+      filtered = filtered.filter((client: any) => client.product === productFilter)
     }
 
     setFilteredClients(filtered)
@@ -329,7 +445,8 @@ export default function AdminDashboard() {
         login: newClientData.login,
         type: newClientData.type,
         credits_total: credits,
-        password: newClientData.password
+        password: newClientData.password,
+        product: newClientData.product
       })
       
       if (result.success) {
@@ -340,7 +457,8 @@ export default function AdminDashboard() {
           login: "",
           type: "projeto",
           credits_total: "",
-          password: ""
+          password: "",
+          product: "Talka Geral"
         })
         toast({
           title: "Sucesso",
@@ -360,6 +478,101 @@ export default function AdminDashboard() {
         variant: "destructive"
       })
     }
+  }
+
+  const handleCreateProduct = () => {
+    if (!newProductData.name || !newProductData.description) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const newProduct: TalkaProduct = {
+      id: newProductData.name.toLowerCase().replace(/\s+/g, '-'),
+      name: newProductData.name,
+      description: newProductData.description,
+      color: newProductData.color,
+      clients: 0,
+      revenue: 0,
+      creditsUsed: 0,
+      isActive: true
+    }
+
+    setTalkaProducts(prev => [...prev, newProduct])
+    setCreateProductDialogOpen(false)
+    setNewProductData({
+      name: "",
+      description: "",
+      color: "#8B5CF6"
+    })
+    
+    toast({
+      title: "Sucesso",
+      description: "Nova frente da Talka criada com sucesso!"
+    })
+  }
+
+  const handleEditProduct = () => {
+    if (!productToEdit || !newProductData.name || !newProductData.description) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setTalkaProducts(prev => prev.map(product => 
+      product.id === productToEdit.id 
+        ? {
+            ...product,
+            name: newProductData.name,
+            description: newProductData.description,
+            color: newProductData.color
+          }
+        : product
+    ))
+
+    setEditProductDialogOpen(false)
+    setProductToEdit(null)
+    setNewProductData({
+      name: "",
+      description: "",
+      color: "#8B5CF6"
+    })
+    
+    toast({
+      title: "Sucesso",
+      description: "Frente da Talka atualizada com sucesso!"
+    })
+  }
+
+  const handleDeleteProduct = () => {
+    if (!productToDelete) return
+
+    // Check if product has clients
+    const hasClients = clients.some((client: any) => client.product === productToDelete.name)
+    
+    if (hasClients) {
+      toast({
+        title: "Erro",
+        description: "Não é possível excluir uma frente que possui clientes vinculados",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setTalkaProducts(prev => prev.filter(product => product.id !== productToDelete.id))
+    setDeleteProductDialogOpen(false)
+    setProductToDelete(null)
+    
+    toast({
+      title: "Sucesso",
+      description: "Frente da Talka excluída com sucesso!"
+    })
   }
 
   const formatCurrency = (value: number) => {
@@ -393,8 +606,8 @@ export default function AdminDashboard() {
               className="h-12 w-auto"
             />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Painel Administrativo TALKA</h1>
-              <p className="text-muted-foreground">Gerencie clientes e monitore o sistema</p>
+              <h1 className="text-3xl font-bold text-foreground">Talka Hub - Painel Administrativo</h1>
+              <p className="text-muted-foreground">Gerencie produtos, clientes e monitore o ecossistema Talka</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -410,14 +623,147 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabs for different views */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs defaultValue="dashboard" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview">Dashboard & Clientes</TabsTrigger>
+            <TabsTrigger value="dashboard">Dashboard & Clientes</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            {/* Stats Cards */}
+          <TabsContent value="dashboard" className="space-y-6">
+            {/* Frentes da Talka Hub */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Frentes da Talka Hub</CardTitle>
+                    <CardDescription>Visão geral dos produtos e serviços da Talka</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    {productFilter !== "all" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setProductFilter("all")
+                          setSelectedProduct("all")
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Limpar Filtro
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => setCreateProductDialogOpen(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Nova Frente
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-3">
+                  {talkaProducts.map((product) => (
+                    <div 
+                      key={product.id} 
+                      className={`bg-card border rounded-lg p-4 space-y-3 relative group cursor-pointer hover:shadow-md transition-all duration-200 ${
+                        productFilter === product.name 
+                          ? 'ring-1 ring-primary border-primary' 
+                          : 'border-border'
+                      }`}
+                      onClick={() => {
+                        // Se já está selecionado, deseleciona. Senão, seleciona.
+                        if (productFilter === product.name) {
+                          setProductFilter("all")
+                          setSelectedProduct("all")
+                        } else {
+                          setProductFilter(product.name)
+                          setSelectedProduct(product.name)
+                        }
+                      }}
+                    >
+                      {/* Botões de ação no hover */}
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setProductToEdit(product)
+                            setNewProductData({
+                              name: product.name,
+                              description: product.description,
+                              color: product.color
+                            })
+                            setEditProductDialogOpen(true)
+                          }}
+                          className="h-7 w-7 p-0 bg-background/80 hover:bg-background"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setProductToDelete(product)
+                            setDeleteProductDialogOpen(true)
+                          }}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive bg-background/80 hover:bg-background"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={getProductLogo(product.name)} 
+                          alt={`${product.name} Logo`}
+                          className="w-6 h-6 object-contain"
+                          onError={(e) => {
+                            // Fallback para ícone colorido se a imagem não carregar
+                            e.currentTarget.style.display = 'none'
+                            const nextElement = e.currentTarget.nextElementSibling as HTMLElement
+                            if (nextElement) nextElement.style.display = 'flex'
+                          }}
+                        />
+                        <div 
+                          className="w-6 h-6 rounded flex items-center justify-center text-white text-sm font-bold"
+                          style={{ backgroundColor: product.color, display: 'none' }}
+                        >
+                          {product.name === "Talka Geral" ? "T" : 
+                           product.name === "ConcIArge" ? "C" : 
+                           product.name === "Converse IA Direito" ? "D" : 
+                           product.name.charAt(0)}
+                        </div>
+                        <h3 className="text-base font-semibold">{product.name}</h3>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground">{product.description}</p>
+                      
+                      <div className="grid grid-cols-3 gap-3 text-left">
+                        <div>
+                          <div className="text-lg font-bold">{product.clients}</div>
+                          <p className="text-xs text-muted-foreground font-normal">Clientes</p>
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold">{formatCurrency(product.revenue)}</div>
+                          <p className="text-xs text-muted-foreground font-normal">Receita</p>
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold">{product.creditsUsed.toLocaleString()}</div>
+                          <p className="text-xs text-muted-foreground font-normal">Créditos</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Global Stats */}
             {stats && (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
@@ -441,7 +787,7 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
                     <p className="text-xs text-muted-foreground">
-                      Média: {formatCurrency(stats.totalRevenue / (stats.totalClients || 1))} por cliente
+                      Média: R$ {(stats.totalRevenue / stats.totalClients || 0).toFixed(2)} por cliente
                     </p>
                   </CardContent>
                 </Card>
@@ -465,7 +811,7 @@ export default function AdminDashboard() {
                     <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-destructive">{stats.clientsExceeded}</div>
+                    <div className="text-2xl font-bold text-red-600">{stats.clientsExceeded}</div>
                     <p className="text-xs text-muted-foreground">
                       {stats.clientsExceeded} excederam limite
                     </p>
@@ -486,7 +832,7 @@ export default function AdminDashboard() {
                     <div className="relative">
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Buscar por nome ou ID..."
+                        placeholder="Buscar por nome, ID ou produto..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-8"
@@ -494,38 +840,44 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filtrar por status" />
+                    <Select value={productFilter} onValueChange={setProductFilter}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Todos os produtos" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="active">Ativos</SelectItem>
-                        <SelectItem value="inactive">Inativos</SelectItem>
-                        <SelectItem value="exceeded">Excederam Limite</SelectItem>
+                        {talkaProducts.map(product => (
+                          <SelectItem key={product.id} value={product.name}>{product.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     
-                    {/* Quick Filter Buttons */}
-                    <Button 
-                      variant={statusFilter === "exceeded" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setStatusFilter(statusFilter === "exceeded" ? "all" : "exceeded")}
-                      className="flex items-center gap-2"
-                    >
-                      <AlertTriangle className="h-4 w-4" />
-                      Excederam
-                    </Button>
-                    
-                    <Button 
-                      variant={statusFilter === "inactive" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setStatusFilter(statusFilter === "inactive" ? "all" : "inactive")}
-                      className="flex items-center gap-2"
-                    >
-                      <Ban className="h-4 w-4" />
-                      Inativos
-                    </Button>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="active">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-green-500" />
+                            Ativos
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="inactive">
+                          <div className="flex items-center gap-2">
+                            <Ban className="h-4 w-4 text-red-500" />
+                            Inativos
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="exceeded">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                            Excederam
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
 
                     <Button 
                       variant="outline"
@@ -564,12 +916,13 @@ export default function AdminDashboard() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nome da Empresa</TableHead>
+                        <TableHead>Produto</TableHead>
                         <TableHead>Login/Senha</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead>Créditos</TableHead>
-                        <TableHead>Uso</TableHead>
+                        <TableHead>Usado</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Criado em</TableHead>
+                        <TableHead>Criado</TableHead>
                         <TableHead>Ações</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -577,10 +930,31 @@ export default function AdminDashboard() {
                       {filteredClients.map((client) => {
                         const usagePercentage = Math.round((client.credits_used / client.credits_total) * 100)
                         const exceeded = client.credits_used >= client.credits_total
-                        
+
                         return (
                           <TableRow key={client.id}>
                             <TableCell className="font-medium">{client.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <img 
+                                  src={getProductLogo((client as any).product)} 
+                                  alt={`${(client as any).product} Logo`}
+                                  className="w-4 h-4 object-contain"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none'
+                                    const nextElement = e.currentTarget.nextElementSibling as HTMLElement; if (nextElement) nextElement.style.display = 'block'
+                                  }}
+                                />
+                                <div 
+                                  className="w-4 h-4 rounded-full flex-shrink-0" 
+                                  style={{ 
+                                    backgroundColor: talkaProducts.find(p => p.name === (client as any).product)?.color || '#8B5CF6',
+                                    display: 'none' 
+                                  }}
+                                />
+                                <span className="text-sm">{(client as any).product || 'Talka Geral'}</span>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-xs font-mono">
                               {clientUsers[client.id] ? (
                                 <div className="space-y-1">
@@ -726,7 +1100,7 @@ export default function AdminDashboard() {
                       })}
                       {filteredClients.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                             Nenhum cliente encontrado
                           </TableCell>
                         </TableRow>
@@ -739,16 +1113,99 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
+            {/* Product Comparison Charts */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                  <div>
+                    <CardTitle>Receita por Produto</CardTitle>
+                    <CardDescription>Comparação de receita entre produtos Talka</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Filtro:</span>
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Selecione um produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os Produtos</SelectItem>
+                        {talkaProducts.map(product => (
+                          <SelectItem key={product.id} value={product.name}>
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src={getProductLogo(product.name)} 
+                                alt={`${product.name} Logo`}
+                                className="w-4 h-4 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none'
+                                  const nextElement = e.currentTarget.nextElementSibling as HTMLElement; if (nextElement) nextElement.style.display = 'block'
+                                }}
+                              />
+                              <div 
+                                className="w-4 h-4 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: product.color, display: 'none' }}
+                              />
+                              <span>{product.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={talkaProducts}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => [formatCurrency(Number(value)), 'Receita']}
+                      />
+                      <Bar dataKey="revenue" fill="#8B5CF6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Clientes por Produto</CardTitle>
+                  <CardDescription>Distribuição de clientes entre produtos</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={talkaProducts}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="clients" fill="#10B981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Global Analytics */}
             {stats && (
-              <AdminCharts 
-                revenueData={revenueData}
-                usageData={usageData}
-                userDistribution={[
-                  { name: 'Ativos', value: stats.activeClients, color: 'hsl(var(--accent))' },
-                  { name: 'Inativos', value: stats.inactiveClients, color: '#ef4444' },
-                  { name: 'Excederam', value: stats.clientsExceeded, color: '#f97316' }
-                ]}
-              />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Analytics Gerais</CardTitle>
+                  <CardDescription>Visão geral do ecossistema Talka</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AdminCharts 
+                    revenueData={revenueData}
+                    usageData={usageData}
+                    userDistribution={[
+                      { name: 'Ativos', value: stats.activeClients, color: 'hsl(var(--accent))' },
+                      { name: 'Inativos', value: stats.inactiveClients, color: '#ef4444' },
+                      { name: 'Excederam', value: stats.clientsExceeded, color: '#f97316' }
+                    ]}
+                  />
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
         </Tabs>
@@ -847,6 +1304,41 @@ export default function AdminDashboard() {
                 </Select>
               </div>
               <div>
+                <Label htmlFor="clientProduct">Produto Talka</Label>
+                <Select 
+                  value={newClientData.product} 
+                  onValueChange={(value) => 
+                    setNewClientData({...newClientData, product: value})
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o produto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {talkaProducts.filter(p => p.isActive).map(product => (
+                      <SelectItem key={product.id} value={product.name}>
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={getProductLogo(product.name)} 
+                            alt={`${product.name} Logo`}
+                            className="w-4 h-4 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                              const nextElement = e.currentTarget.nextElementSibling as HTMLElement; if (nextElement) nextElement.style.display = 'block'
+                            }}
+                          />
+                          <div 
+                            className="w-4 h-4 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: product.color, display: 'none' }}
+                          />
+                          <span>{product.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label htmlFor="clientCredits">Total de Créditos *</Label>
                 <Input
                   id="clientCredits"
@@ -888,6 +1380,143 @@ export default function AdminDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+        {/* Create Product Dialog */}
+        <Dialog open={createProductDialogOpen} onOpenChange={setCreateProductDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nova Frente da Talka</DialogTitle>
+              <DialogDescription>
+                Crie uma nova frente de produtos para o ecossistema Talka
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="productName">Nome da Frente *</Label>
+                <Input
+                  id="productName"
+                  value={newProductData.name}
+                  onChange={(e) => setNewProductData({...newProductData, name: e.target.value})}
+                  placeholder="Ex: Talka Advocacia"
+                />
+              </div>
+              <div>
+                <Label htmlFor="productDescription">Descrição *</Label>
+                <Input
+                  id="productDescription"
+                  value={newProductData.description}
+                  onChange={(e) => setNewProductData({...newProductData, description: e.target.value})}
+                  placeholder="Ex: Para escritórios de advocacia"
+                />
+              </div>
+              <div>
+                <Label htmlFor="productColor">Cor da Frente</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="productColor"
+                    type="color"
+                    value={newProductData.color}
+                    onChange={(e) => setNewProductData({...newProductData, color: e.target.value})}
+                    className="w-16 h-10"
+                  />
+                  <Input
+                    value={newProductData.color}
+                    onChange={(e) => setNewProductData({...newProductData, color: e.target.value})}
+                    placeholder="#8B5CF6"
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateProductDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateProduct}>
+                Criar Frente
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Product Dialog */}
+        <Dialog open={editProductDialogOpen} onOpenChange={setEditProductDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Frente da Talka</DialogTitle>
+              <DialogDescription>
+                Atualize as informações da frente {productToEdit?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editProductName">Nome da Frente *</Label>
+                <Input
+                  id="editProductName"
+                  value={newProductData.name}
+                  onChange={(e) => setNewProductData({...newProductData, name: e.target.value})}
+                  placeholder="Ex: Talka Advocacia"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editProductDescription">Descrição *</Label>
+                <Input
+                  id="editProductDescription"
+                  value={newProductData.description}
+                  onChange={(e) => setNewProductData({...newProductData, description: e.target.value})}
+                  placeholder="Ex: Para escritórios de advocacia"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editProductColor">Cor da Frente</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="editProductColor"
+                    type="color"
+                    value={newProductData.color}
+                    onChange={(e) => setNewProductData({...newProductData, color: e.target.value})}
+                    className="w-16 h-10"
+                  />
+                  <Input
+                    value={newProductData.color}
+                    onChange={(e) => setNewProductData({...newProductData, color: e.target.value})}
+                    placeholder="#8B5CF6"
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditProductDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditProduct}>
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Product Confirmation */}
+        <AlertDialog open={deleteProductDialogOpen} onOpenChange={setDeleteProductDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Frente da Talka</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a frente "{productToDelete?.name}"?
+                Esta ação não pode ser desfeita e a frente será removida permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteProduct}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir Frente
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )

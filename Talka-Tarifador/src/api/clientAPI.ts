@@ -15,6 +15,7 @@ interface CreateClientData {
   type: "projeto" | "individual"
   credits_total: number
   password: string // Senha do cliente
+  product: string // Nome do produto Talka
 }
 
 class ClientAPI {
@@ -25,7 +26,7 @@ class ClientAPI {
     
     try {
       const { data: clients, error } = await supabase
-        .from('clients')
+        .from('clients_with_products')
         .select('*')
         .order('id', { ascending: true })
 
@@ -52,6 +53,21 @@ class ClientAPI {
       // Get the current admin user ID (assuming admin is always user ID 1)
       const currentAdminId = 1 // TODO: Get from auth context
       
+      // First, get the product ID from the product name
+      const { data: product, error: productError } = await supabase
+        .from('talka_products')
+        .select('id')
+        .eq('name', data.product)
+        .single()
+
+      if (productError || !product) {
+        console.error('❌ Error finding product:', productError)
+        return {
+          success: false,
+          message: `Produto "${data.product}" não encontrado`
+        }
+      }
+      
       // Create client directly in clients table
       const { data: newClient, error } = await supabase
         .from('clients')
@@ -63,7 +79,8 @@ class ClientAPI {
           credits_total: data.credits_total,
           credits_used: 0,
           is_active: true,
-          created_by: currentAdminId
+          created_by: currentAdminId,
+          product_id: product.id
         })
         .select()
         .single()
