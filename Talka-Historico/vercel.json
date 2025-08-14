@@ -35,6 +35,11 @@
       "src": "/api/(.*)",
       "dest": "/api/$1.ts"
     }
+    ,
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ],
   "env": {
     "NODE_ENV": "production"
