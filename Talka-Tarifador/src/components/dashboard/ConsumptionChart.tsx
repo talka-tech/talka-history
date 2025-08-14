@@ -9,9 +9,10 @@ interface ConsumptionData {
 
 interface ConsumptionChartProps {
   data: ConsumptionData[]
+  cardColor?: string
 }
 
-export function ConsumptionChart({ data }: ConsumptionChartProps) {
+export function ConsumptionChart({ data, cardColor }: ConsumptionChartProps) {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0]?.payload
@@ -28,7 +29,10 @@ export function ConsumptionChart({ data }: ConsumptionChartProps) {
   }
 
   return (
-    <Card className="col-span-full transition-all duration-300 hover:shadow-elegant animate-fade-in">
+    <Card
+      className="col-span-full transition-all duration-300 hover:shadow-elegant animate-fade-in"
+      style={cardColor ? { background: cardColor } : {}}
+    >
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-foreground">
           Consumo Diário - {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}

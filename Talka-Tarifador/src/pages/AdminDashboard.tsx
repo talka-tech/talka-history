@@ -72,10 +72,12 @@ export default function AdminDashboard() {
   const [newClientData, setNewClientData] = useState({
     name: "",
     login: "",
-    type: "projeto" as "projeto" | "individual",
     credits_total: "",
     password: "",
-    product: "Talka Geral"
+    product: "Talka Geral",
+    color: "#8B5CF6",
+    logoFile: null as File | null,
+    logo_url: ""
   })
   const [newProductData, setNewProductData] = useState({
     name: "",
@@ -538,13 +540,33 @@ export default function AdminDashboard() {
         return
       }
 
+      let logoUrl = ""
+      if (newClientData.logoFile) {
+        // Upload logo para Supabase Storage (bucket correto: client-logos)
+  const fileExt = newClientData.logoFile.name.split('.').pop()
+  // Remove acentos e caracteres especiais do nome
+  const sanitize = (str) => str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9-_]/g, '')
+  const safeName = sanitize(newClientData.name.toLowerCase().replace(/\s+/g, '-'))
+  const fileName = `${safeName}-${Date.now()}.${fileExt}`
+        console.log('[UPLOAD LOGO] fileName:', fileName, 'file:', newClientData.logoFile)
+        const { data, error } = await supabase.storage.from('client-logos').upload(fileName, newClientData.logoFile)
+        if (!error && data) {
+          const { data: publicUrl } = supabase.storage.from('client-logos').getPublicUrl(fileName)
+          logoUrl = publicUrl.publicUrl
+        } else {
+          console.error('[UPLOAD LOGO ERROR]', error, 'fileName:', fileName, 'file:', newClientData.logoFile)
+          toast({ title: "Erro ao fazer upload da logo", description: error?.message, variant: "destructive" })
+        }
+      }
+
       const result = await clientAPI.createClient({
         name: newClientData.name,
         login: newClientData.login,
-        type: newClientData.type,
         credits_total: credits,
         password: newClientData.password,
-        product: newClientData.product
+        product: newClientData.product,
+        color: newClientData.color,
+        logo_url: logoUrl
       })
       
       if (result.success) {
@@ -553,10 +575,12 @@ export default function AdminDashboard() {
         setNewClientData({
           name: "",
           login: "",
-          type: "projeto",
           credits_total: "",
           password: "",
-          product: "Talka Geral"
+          product: "Talka Geral",
+          color: "#8B5CF6",
+          logoFile: null,
+          logo_url: ""
         })
         toast({
           title: "Sucesso",
@@ -1081,7 +1105,6 @@ export default function AdminDashboard() {
                         <TableHead>Nome da Empresa</TableHead>
                         <TableHead>Produto</TableHead>
                         <TableHead>Login/Senha</TableHead>
-                        <TableHead>Tipo</TableHead>
                         <TableHead>Créditos</TableHead>
                         <TableHead>Usado</TableHead>
                         <TableHead>Status</TableHead>
@@ -1100,30 +1123,26 @@ export default function AdminDashboard() {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 {(() => {
-                                  const prod = talkaProducts.find(p => p.name === (client as any).product)
-                                  if (prod && prod.logo_url) {
-                                    return (
-                                      <img
-                                        src={prod.logo_url}
-                                        alt={`${prod.name} Logo`}
-                                        className="w-4 h-4 object-contain"
-                                        onError={e => {
-                                          e.currentTarget.style.display = 'none'
-                                          const next = e.currentTarget.nextElementSibling as HTMLElement
-                                          if (next) next.style.display = 'flex'
-                                        }}
-                                      />
-                                    )
-                                  } else {
-                                    return (
-                                      <div
-                                        className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
-                                        style={{ backgroundColor: prod?.color || '#8B5CF6' }}
-                                      >
-                                        {(client as any).product?.charAt(0) || 'T'}
-                                      </div>
-                                    )
+                                  const productName = (client as any).product;
+                                  if (productName === 'Talka Geral') {
+                                    return <img src="/logos/talka_logo.png" alt="Talka Geral Logo" className="w-6 h-6 object-contain rounded-full" />
                                   }
+                                  if (productName === 'ConcIArge') {
+                                    return <img src="/logos/conciarge_logo.png" alt="ConcIArge Logo" className="w-6 h-6 object-contain rounded-full" />
+                                  }
+                                  if (productName === 'Converse IA Direito') {
+                                    return <img src="/logos/converseiadireito_logo.png" alt="Converse IA Direito Logo" className="w-6 h-6 object-contain rounded-full" />
+                                  }
+                                  // fallback: círculo colorido com inicial
+                                  const prod = talkaProducts.find(p => p.name === productName);
+                                  return (
+                                    <div
+                                      className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                                      style={{ backgroundColor: prod?.color || '#8B5CF6' }}
+                                    >
+                                      {productName?.charAt(0) || 'T'}
+                                    </div>
+                                  );
                                 })()}
                                 <span className="text-sm">{(client as any).product || 'Talka Geral'}</span>
                               </div>
@@ -1200,11 +1219,7 @@ export default function AdminDashboard() {
                                 <div className="text-muted-foreground">-</div>
                               )}
                             </TableCell>
-                            <TableCell>
-                              <Badge variant={client.type === "projeto" ? "secondary" : "default"}>
-                                {client.type}
-                              </Badge>
-                            </TableCell>
+                            {/* coluna 'Tipo' removida */}
                             <TableCell>
                               <div className="text-sm">
                                 <div>{client.credits_total.toLocaleString()}</div>
@@ -1479,23 +1494,7 @@ export default function AdminDashboard() {
                   Esta senha será usada pelo cliente para fazer login
                 </p>
               </div>
-              <div>
-                <Label htmlFor="clientType">Tipo de Cliente</Label>
-                <Select 
-                  value={newClientData.type} 
-                  onValueChange={(value: "projeto" | "individual") => 
-                    setNewClientData({...newClientData, type: value})
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="projeto">Projeto</SelectItem>
-                    <SelectItem value="individual">Individual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
               <div>
                 <Label htmlFor="clientProduct">Produto Talka</Label>
                 <Select 
@@ -1540,6 +1539,37 @@ export default function AdminDashboard() {
                   onChange={(e) => setNewClientData({...newClientData, credits_total: e.target.value})}
                   placeholder="Digite o limite de créditos"
                 />
+              </div>
+              <div>
+                <Label htmlFor="clientColor">Cor da Empresa</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="clientColor"
+                    type="color"
+                    value={newClientData.color}
+                    onChange={e => setNewClientData({ ...newClientData, color: e.target.value })}
+                    className="w-16 h-10"
+                  />
+                  <Input
+                    value={newClientData.color}
+                    onChange={e => setNewClientData({ ...newClientData, color: e.target.value })}
+                    placeholder="#8B5CF6"
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="clientLogo">Logo da Empresa</Label>
+                <Input
+                  id="clientLogo"
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    const file = e.target.files?.[0] || null
+                    setNewClientData(data => ({ ...data, logoFile: file }))
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Se não enviar uma logo, será exibido apenas a cor personalizada.</p>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>

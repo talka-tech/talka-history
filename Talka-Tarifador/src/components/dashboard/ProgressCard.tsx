@@ -14,6 +14,7 @@ interface ProgressCardProps {
   showAlert?: boolean
   alertType?: "warning" | "blocked"
   onUpgrade?: () => void
+  cardColor?: string
 }
 
 export function ProgressCard({
@@ -25,37 +26,41 @@ export function ProgressCard({
   variant = "default",
   showAlert = false,
   alertType = "warning",
-  onUpgrade
+  onUpgrade,
+  cardColor
 }: ProgressCardProps) {
   const percentage = Math.round((current / total) * 100)
-  
+
   const getVariant = () => {
     if (variant === "warning") return "warning"
     if (variant === "destructive") return "destructive"
-    if (percentage >= 85) return "warning"
     if (percentage >= 100) return "destructive"
+    if (percentage >= 85) return "warning"
     return "default"
   }
 
   const currentVariant = getVariant()
 
   const variantStyles = {
-    default: "border-card-border",
+    default: "border-[color:var(--client-primary,theme(colors.accent.DEFAULT))]/30 bg-gradient-to-br from-[color:var(--client-primary,theme(colors.accent.DEFAULT))]/5 to-[color:var(--client-primary,theme(colors.accent.DEFAULT))]/10",
     warning: "border-warning/30 bg-gradient-to-br from-warning/5 to-warning/10 shadow-warning/20",
     destructive: "border-destructive/30 bg-gradient-to-br from-destructive/5 to-destructive/10 shadow-destructive/20 animate-pulse-glow"
   }
 
   const progressVariants = {
-    default: "bg-accent",
+    default: "bg-[color:var(--client-primary,theme(colors.accent.DEFAULT))]",
     warning: "bg-warning",
     destructive: "bg-destructive"
   }
 
   return (
-    <Card className={cn(
-      "transition-all duration-300 hover:shadow-elegant animate-fade-in",
-      variantStyles[currentVariant]
-    )}>
+    <Card
+      className={cn(
+        "transition-all duration-300 hover:shadow-elegant animate-fade-in",
+        variantStyles[currentVariant]
+      )}
+      style={cardColor ? { background: cardColor } : {}}
+    >
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}

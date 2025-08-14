@@ -12,10 +12,11 @@ interface CreateUsageData {
 interface CreateClientData {
   name: string // Nome da empresa
   login: string // Login único do cliente
-  type: "projeto" | "individual"
   credits_total: number
   password: string // Senha do cliente
   product: string // Nome do produto Talka
+  color?: string // Cor personalizada do cliente
+  logo_url?: string // URL da logo do cliente
 }
 
 class ClientAPI {
@@ -91,12 +92,13 @@ class ClientAPI {
           name: data.name,
           login: data.login,
           password: data.password,
-          type: data.type,
           credits_total: data.credits_total,
           credits_used: 0,
           is_active: true,
           created_by: currentAdminId,
-          product_id: product.id
+          product_id: product.id,
+          color: data.color || null,
+          logo_url: data.logo_url || null
         })
         .select()
         .single()

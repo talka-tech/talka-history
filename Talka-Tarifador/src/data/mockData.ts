@@ -16,6 +16,8 @@ export interface ClientData {
     credits: number
     date: string
   }>
+  color?: string // Cor primária do cliente
+  logo_url?: string // Logo do cliente
 }
 
 // Generate mock monthly data for fallback
@@ -57,7 +59,9 @@ const generateMockMonthlyData = (usedCredits: number) => {
 }
 
 // Convert Supabase client to legacy format for compatibility
-const convertClientData = (client: Client): ClientData => {
+const convertClientData = (client: any): ClientData => {
+  // client pode vir com talka_products aninhado
+  const product = client.talka_products || {};
   return {
     id: client.id.toString(),
     name: client.name,
@@ -68,7 +72,9 @@ const convertClientData = (client: Client): ClientData => {
       remaining: client.credits_remaining
     },
     lastUsage: client.last_usage ? new Date(client.last_usage) : new Date(),
-    monthlyConsumption: generateMockMonthlyData(client.credits_used)
+    monthlyConsumption: generateMockMonthlyData(client.credits_used),
+    color: client.color || product.color || undefined,
+    logo_url: client.logo_url || product.logo_url || undefined
   }
 }
 
@@ -85,7 +91,9 @@ export const getCurrentClient = async (): Promise<ClientData> => {
         type: 'comum',
         credits: { total: 0, used: 0, remaining: 0 },
         lastUsage: new Date(),
-        monthlyConsumption: []
+        monthlyConsumption: [],
+        color: '#2563eb',
+        logo_url: '/logos/talka_logo.png'
       }
     }
 
@@ -99,7 +107,9 @@ export const getCurrentClient = async (): Promise<ClientData> => {
         type: 'comum',
         credits: { total: 0, used: 0, remaining: 0 },
         lastUsage: new Date(),
-        monthlyConsumption: []
+        monthlyConsumption: [],
+        color: '#2563eb',
+        logo_url: '/logos/talka_logo.png'
       }
     }
 
@@ -126,7 +136,9 @@ export const getCurrentClient = async (): Promise<ClientData> => {
               remaining: 3750 
             },
             lastUsage: new Date(Date.now() - 45 * 60 * 1000), // 45 min atrás
-            monthlyConsumption: generateMockMonthlyData(1250)
+            monthlyConsumption: generateMockMonthlyData(1250),
+            color: '#2563eb',
+            logo_url: '/logos/talka_logo.png'
           }
         }
       } catch (dbError) {
@@ -141,7 +153,9 @@ export const getCurrentClient = async (): Promise<ClientData> => {
             remaining: 3750 
           },
           lastUsage: new Date(Date.now() - 45 * 60 * 1000),
-          monthlyConsumption: generateMockMonthlyData(1250)
+          monthlyConsumption: generateMockMonthlyData(1250),
+          color: '#2563eb',
+          logo_url: '/logos/talka_logo.png'
         }
       }
     }
@@ -153,7 +167,9 @@ export const getCurrentClient = async (): Promise<ClientData> => {
       type: 'individual',
       credits: { total: 0, used: 0, remaining: 0 },
       lastUsage: new Date(),
-      monthlyConsumption: []
+      monthlyConsumption: [],
+      color: '#2563eb',
+      logo_url: '/logos/talka_logo.png'
     }
   } catch (error) {
     console.error('Error getting current client:', error)
@@ -164,7 +180,9 @@ export const getCurrentClient = async (): Promise<ClientData> => {
       type: 'comum',
       credits: { total: 0, used: 0, remaining: 0 },
       lastUsage: new Date(),
-      monthlyConsumption: []
+      monthlyConsumption: [],
+      color: '#2563eb',
+      logo_url: '/logos/talka_logo.png'
     }
   }
 }

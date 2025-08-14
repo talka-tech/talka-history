@@ -13,44 +13,13 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
-import { getCurrentClient, ClientData } from "@/data/mockData"
-import { useState, useEffect } from "react"
+import { useClient } from "@/contexts/ClientContext"
 
 export function AppSidebar() {
   const { state } = useSidebar()
   const { user, logout, isAdmin } = useAuth()
-  const [client, setClient] = useState<ClientData | null>(null)
+  const { client, loading: clientLoading } = useClient();
   const collapsed = state === "collapsed"
-
-  const loadClient = async () => {
-    // Only load for non-admin users
-    if (user && !isAdmin) {
-      try {
-        const clientData = await getCurrentClient()
-        setClient(clientData)
-      } catch (error) {
-        console.error('Error loading client:', error)
-      }
-    }
-  }
-
-  useEffect(() => {
-    loadClient()
-  }, [user, isAdmin])
-
-  // Listen for client updates
-  useEffect(() => {
-    const handleClientUpdate = () => {
-      loadClient()
-    }
-
-    // Listen for custom event when client data is updated
-    window.addEventListener('clientDataUpdated', handleClientUpdate)
-    
-    return () => {
-      window.removeEventListener('clientDataUpdated', handleClientUpdate)
-    }
-  }, [user, isAdmin])
 
   // Get display name - prioritize user name, then client name
   const getDisplayName = () => {
@@ -96,44 +65,58 @@ export function AppSidebar() {
     },
   ]
 
+  // White label: cor e logo do cliente
+  const clientColor = !isAdmin && client?.color ? client.color : undefined;
+  const clientLogo = !isAdmin && client?.logo_url ? client.logo_url : "/logo.png";
+  const clientName = !isAdmin && client?.name ? client.name : undefined;
+
+  if (!isAdmin && clientLoading) {
+    // Show skeleton or nothing while loading client data
+    return (
+      <Sidebar className="border-card-border bg-card/50 backdrop-blur-sm">
+        <SidebarHeader className="border-b border-card-border/50 p-4">
+          <div className="flex items-center gap-3 animate-pulse">
+            <div className="h-10 w-10 bg-muted rounded-xl" />
+            {!collapsed && <div className="h-6 w-32 bg-muted rounded" />}
+          </div>
+        </SidebarHeader>
+      </Sidebar>
+    )
+  }
+
   return (
-    <Sidebar className="border-card-border bg-card/50 backdrop-blur-sm">
+  <Sidebar className="border-card-border bg-card/50 backdrop-blur-sm">
       <SidebarHeader className="border-b border-card-border/50 p-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center shadow-md">
+          <div className="h-10 w-10 flex items-center justify-center">
             <img 
-              src="/logo.png" 
-              alt="Talka Logo" 
-              className="h-6 w-6 object-contain filter brightness-0 saturate-0 opacity-60"
+              src={clientLogo} 
+              alt={clientName ? `Logo ${clientName}` : "Talka Logo"} 
+              className="h-10 w-10 object-contain rounded-xl"
             />
           </div>
           {!collapsed && (
             <div className="flex-1">
               <h1 className="font-bold text-lg bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                Tarifador Talka
+                Tarifador{clientName ? ` ${clientName}` : ' Talka'}
               </h1>
-              <p className="text-xs text-muted-foreground font-medium">Tarifador + BI</p>
             </div>
           )}
         </div>
         
         {/* Informações do usuário */}
         {!collapsed && user && (
-          <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/20 backdrop-blur-sm">
+          <div className="mt-4 p-3 rounded-xl border" style={clientColor ? { borderColor: clientColor, background: clientColor + '20' } : {}}>
             <div className="flex items-center gap-2 mb-2">
-              <div className={`h-6 w-6 rounded-full ${isAdmin ? 'bg-orange-500/20' : 'bg-accent/20'} flex items-center justify-center`}>
-                {isAdmin ? (
-                  <Shield className="h-3 w-3 text-orange-500" />
-                ) : (
-                  <User className="h-3 w-3 text-accent" />
-                )}
+              <div className="h-6 w-6 rounded-full flex items-center justify-center" style={clientColor ? { background: clientColor } : {}}>
+                <User className="h-3 w-3 stroke-[1.5] text-background" />
               </div>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-xs font-medium" style={clientColor ? { color: clientColor } : {}}>
                 {isAdmin ? 'Administrador' : 'Bem-vindo(a)'}
               </p>
             </div>
             <p className="text-sm font-semibold text-foreground truncate">{getDisplayName()}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.company || 'Empresa'}</p>
+            <p className="text-xs text-muted-foreground truncate">Empresa</p>
             {isAdmin && (
               <div className="mt-2">
                 <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200">
@@ -145,7 +128,7 @@ export function AppSidebar() {
         )}
       </SidebarHeader>
 
-      <SidebarContent className="p-3">
+  <SidebarContent className="p-3">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-2">
@@ -157,8 +140,8 @@ export function AppSidebar() {
                       className={({ isActive }) =>
                         `flex items-center ${collapsed ? 'justify-center px-3' : 'gap-3 px-4'} py-3 rounded-xl transition-all duration-200 group relative ${
                           isActive 
-                            ? "bg-gradient-to-r from-accent/20 to-accent/10 text-accent font-semibold shadow-sm border border-accent/20" 
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent/5 hover:shadow-sm"
+                            ? (clientColor ? `bg-[${clientColor}]/20 text-[${clientColor}] font-semibold shadow-sm border border-[${clientColor}]/20` : "font-semibold shadow-sm border border-accent/20")
+                            : (clientColor ? `text-[${clientColor}] hover:text-foreground hover:bg-[${clientColor}]/10 hover:shadow-sm` : "text-muted-foreground hover:text-foreground hover:bg-accent/5 hover:shadow-sm")
                         }`
                       }
                     >
@@ -166,19 +149,22 @@ export function AppSidebar() {
                         <>
                           {/* Indicador visual para página ativa */}
                           {isActive && (
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-accent rounded-r-full" />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={clientColor ? { background: clientColor } : {}} />
                           )}
                           
-                          <item.icon className={`h-5 w-5 ${isActive ? 'text-accent' : ''} transition-colors duration-200`} />
+                          <item.icon className={`h-5 w-5`} style={clientColor ? { color: clientColor } : {}} />
                           
                           {!collapsed && (
-                            <span className="text-sm font-medium transition-colors duration-200">
+                            <span className="text-sm font-medium transition-colors duration-200" style={clientColor ? { color: clientColor } : {}}>
                               {item.title}
                             </span>
                           )}
                           
                           {/* Efeito hover */}
-                          {!isActive && (
+                          {!isActive && clientColor && (
+                            <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ background: clientColor + '10', borderColor: clientColor }} />
+                          )}
+                          {!isActive && !clientColor && (
                             <div className="absolute inset-0 rounded-xl bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                           )}
                         </>
