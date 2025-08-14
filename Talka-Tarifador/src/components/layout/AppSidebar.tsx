@@ -25,16 +25,28 @@ export function AppSidebar() {
 
   useEffect(() => {
     const loadClient = async () => {
-      try {
-        const clientData = await getCurrentClient()
-        setClient(clientData)
-      } catch (error) {
-        console.error('Error loading client:', error)
+      // Only load if we don't have client data and user is not admin
+      if (!client && user && !isAdmin) {
+        try {
+          const clientData = await getCurrentClient()
+          setClient(clientData)
+        } catch (error) {
+          console.error('Error loading client:', error)
+        }
       }
     }
 
     loadClient()
-  }, [])
+  }, [user, isAdmin, client])
+
+  // Get display name - prioritize user name, then client name
+  const getDisplayName = () => {
+    if (isAdmin) {
+      return user?.name || 'Administrador'
+    }
+    // For clients, use user name first (more reliable), then client name as fallback
+    return user?.name || client?.name || 'Cliente'
+  }
 
   // Navigation items based on user role
   const navigation = isAdmin ? [
@@ -107,8 +119,8 @@ export function AppSidebar() {
                 {isAdmin ? 'Administrador' : 'Bem-vindo(a)'}
               </p>
             </div>
-            <p className="text-sm font-semibold text-foreground truncate">{client?.name || 'Carregando...'}</p>
-            <p className="text-xs text-muted-foreground truncate">{user.company}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{getDisplayName()}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.company || 'Empresa'}</p>
             {isAdmin && (
               <div className="mt-2">
                 <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200">
