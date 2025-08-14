@@ -11,7 +11,6 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
 import { getCurrentClient, ClientData } from "@/data/mockData"
@@ -23,21 +22,35 @@ export function AppSidebar() {
   const [client, setClient] = useState<ClientData | null>(null)
   const collapsed = state === "collapsed"
 
-  useEffect(() => {
-    const loadClient = async () => {
-      // Only load if we don't have client data and user is not admin
-      if (!client && user && !isAdmin) {
-        try {
-          const clientData = await getCurrentClient()
-          setClient(clientData)
-        } catch (error) {
-          console.error('Error loading client:', error)
-        }
+  const loadClient = async () => {
+    // Only load for non-admin users
+    if (user && !isAdmin) {
+      try {
+        const clientData = await getCurrentClient()
+        setClient(clientData)
+      } catch (error) {
+        console.error('Error loading client:', error)
       }
     }
+  }
 
+  useEffect(() => {
     loadClient()
-  }, [user, isAdmin, client])
+  }, [user, isAdmin])
+
+  // Listen for client updates
+  useEffect(() => {
+    const handleClientUpdate = () => {
+      loadClient()
+    }
+
+    // Listen for custom event when client data is updated
+    window.addEventListener('clientDataUpdated', handleClientUpdate)
+    
+    return () => {
+      window.removeEventListener('clientDataUpdated', handleClientUpdate)
+    }
+  }, [user, isAdmin])
 
   // Get display name - prioritize user name, then client name
   const getDisplayName = () => {
@@ -179,12 +192,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className="mt-auto p-4 border-t border-card-border/50 space-y-3">
-        {/* Theme Toggle */}
-        <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-center'}`}>
-          <ThemeToggle />
-        </div>
-        
+      <div className="mt-auto p-4 border-t border-card-border/50">
         {/* Logout Button */}
         {!collapsed && (
           <Button

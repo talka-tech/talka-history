@@ -193,6 +193,39 @@ class ClientAPI {
     }
   }
 
+  // Update client information (name, etc.)
+  async updateClient(clientId: number, updates: { name?: string }): Promise<{ success: boolean; message: string }> {
+    await delay(300)
+    
+    try {
+      const { data: updatedClient, error } = await supabase
+        .from('clients')
+        .update(updates)
+        .eq('id', clientId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error updating client:', error)
+        return {
+          success: false,
+          message: `Erro ao atualizar cliente: ${error.message}`
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Cliente atualizado com sucesso'
+      }
+    } catch (error) {
+      console.error('Unexpected error updating client:', error)
+      return {
+        success: false,
+        message: 'Erro ao atualizar cliente'
+      }
+    }
+  }
+
   // Toggle client status (admin only)
   async toggleClientStatus(clientId: number): Promise<{ success: boolean; message: string }> {
     try {
