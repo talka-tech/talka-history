@@ -74,10 +74,7 @@ export default function AdminDashboard() {
     login: "",
     credits_total: "",
     password: "",
-    product: "Talka Geral",
-    color: "#8B5CF6",
-    logoFile: null as File | null,
-    logo_url: ""
+    product: "Talka Geral"
   })
   const [newProductData, setNewProductData] = useState({
     name: "",
@@ -209,6 +206,74 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('Erro ao garantir produtos padrão:', error)
+    }
+  }
+
+  // Função para editar uma frente/produto existente
+  const handleEditProduct = async () => {
+    if (!productToEdit) return;
+    if (!newProductData.name || !newProductData.description) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    let logoUrl = newProductData.logo_url;
+    if (newProductData.logoFile) {
+      // Upload logo para Supabase Storage
+      const fileExt = newProductData.logoFile.name.split('.').pop();
+      const fileName = `${newProductData.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.${fileExt}`;
+      const { data, error } = await supabase.storage.from('product-logos').upload(fileName, newProductData.logoFile);
+      if (!error && data) {
+        const { data: publicUrl } = supabase.storage.from('product-logos').getPublicUrl(fileName);
+        logoUrl = publicUrl.publicUrl;
+      } else {
+        toast({ title: "Erro ao fazer upload da logo", description: error?.message, variant: "destructive" });
+      }
+    }
+
+    // Atualizar no Supabase
+    const result = await productAPI.updateProduct(productToEdit.id, {
+      name: newProductData.name,
+      description: newProductData.description,
+      color: newProductData.color,
+      logo_url: logoUrl
+    });
+
+    if (result.success) {
+      setTalkaProducts(prev => prev.map(product =>
+        product.id === productToEdit.id
+          ? {
+              ...product,
+              name: newProductData.name,
+              description: newProductData.description,
+              color: newProductData.color,
+              logo_url: logoUrl
+            }
+          : product
+      ));
+      setEditProductDialogOpen(false);
+      setProductToEdit(null);
+      setNewProductData({
+        name: "",
+        description: "",
+        color: "#8B5CF6",
+        logoFile: null,
+        logo_url: ""
+      });
+      toast({
+        title: "Sucesso",
+        description: "Frente da Talka atualizada com sucesso!"
+      });
+    } else {
+      toast({
+        title: "Erro",
+        description: result.error || "Erro ao atualizar frente",
+        variant: "destructive"
+      });
     }
   }
 
@@ -540,24 +605,10 @@ export default function AdminDashboard() {
         return
       }
 
-      let logoUrl = ""
-      if (newClientData.logoFile) {
-        // Upload logo para Supabase Storage (bucket correto: client-logos)
-  const fileExt = newClientData.logoFile.name.split('.').pop()
-  // Remove acentos e caracteres especiais do nome
-  const sanitize = (str) => str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9-_]/g, '')
-  const safeName = sanitize(newClientData.name.toLowerCase().replace(/\s+/g, '-'))
-  const fileName = `${safeName}-${Date.now()}.${fileExt}`
-        console.log('[UPLOAD LOGO] fileName:', fileName, 'file:', newClientData.logoFile)
-        const { data, error } = await supabase.storage.from('client-logos').upload(fileName, newClientData.logoFile)
-        if (!error && data) {
-          const { data: publicUrl } = supabase.storage.from('client-logos').getPublicUrl(fileName)
-          logoUrl = publicUrl.publicUrl
-        } else {
-          console.error('[UPLOAD LOGO ERROR]', error, 'fileName:', fileName, 'file:', newClientData.logoFile)
-          toast({ title: "Erro ao fazer upload da logo", description: error?.message, variant: "destructive" })
-        }
-      }
+      // Buscar cor e logo da frente selecionada
+      const selectedProduct = talkaProducts.find(p => p.name === newClientData.product)
+      const color = selectedProduct?.color || "#8B5CF6"
+      const logo_url = selectedProduct?.logo_url || "/logos/talka_logo.png"
 
       const result = await clientAPI.createClient({
         name: newClientData.name,
@@ -565,8 +616,7 @@ export default function AdminDashboard() {
         credits_total: credits,
         password: newClientData.password,
         product: newClientData.product,
-        color: newClientData.color,
-        logo_url: logoUrl
+        // color e logo_url não são mais enviados nem salvos para o cliente
       })
       
       if (result.success) {
@@ -577,10 +627,7 @@ export default function AdminDashboard() {
           login: "",
           credits_total: "",
           password: "",
-          product: "Talka Geral",
-          color: "#8B5CF6",
-          logoFile: null,
-          logo_url: ""
+          product: "Talka Geral"
         })
         toast({
           title: "Sucesso",
@@ -639,11 +686,15 @@ export default function AdminDashboard() {
       setTalkaProducts(prev => [
         ...prev,
         {
-          ...result.data,
+          id: result.data.id,
+          name: result.data.name,
+          description: result.data.description,
+          color: result.data.color,
+          logo_url: result.data.logo_url,
           clients: 0,
           revenue: 0,
           creditsUsed: 0,
-          isActive: true
+          isActive: result.data.is_active ?? true
         }
       ])
       setCreateProductDialogOpen(false)
@@ -657,22 +708,6 @@ export default function AdminDashboard() {
       toast({
         title: "Sucesso",
         description: "Nova frente da Talka criada com sucesso!"
-      })
-    } else {
-      toast({
-        title: "Erro",
-        description: result.error || "Erro ao criar frente",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const handleEditProduct = () => {
-    if (!productToEdit || !newProductData.name || !newProductData.description) {
-      toast({
-        title: "Erro",
-        description: "Preencha todos os campos obrigatórios",
-        variant: "destructive"
       })
       return
     }
@@ -1540,37 +1575,7 @@ export default function AdminDashboard() {
                   placeholder="Digite o limite de créditos"
                 />
               </div>
-              <div>
-                <Label htmlFor="clientColor">Cor da Empresa</Label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    id="clientColor"
-                    type="color"
-                    value={newClientData.color}
-                    onChange={e => setNewClientData({ ...newClientData, color: e.target.value })}
-                    className="w-16 h-10"
-                  />
-                  <Input
-                    value={newClientData.color}
-                    onChange={e => setNewClientData({ ...newClientData, color: e.target.value })}
-                    placeholder="#8B5CF6"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="clientLogo">Logo da Empresa</Label>
-                <Input
-                  id="clientLogo"
-                  type="file"
-                  accept="image/*"
-                  onChange={e => {
-                    const file = e.target.files?.[0] || null
-                    setNewClientData(data => ({ ...data, logoFile: file }))
-                  }}
-                />
-                <p className="text-xs text-muted-foreground mt-1">Se não enviar uma logo, será exibido apenas a cor personalizada.</p>
-              </div>
+              {/* Campo de logo removido, pois a logo é definida pela frente selecionada */}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
                   Cancelar

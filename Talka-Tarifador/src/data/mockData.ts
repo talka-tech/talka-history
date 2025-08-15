@@ -73,8 +73,8 @@ const convertClientData = (client: any): ClientData => {
     },
     lastUsage: client.last_usage ? new Date(client.last_usage) : new Date(),
     monthlyConsumption: generateMockMonthlyData(client.credits_used),
-    color: client.color || product.color || undefined,
-    logo_url: client.logo_url || product.logo_url || undefined
+  color: typeof product.color === 'string' ? product.color : undefined,
+  logo_url: product.logo_url || undefined
   }
 }
 

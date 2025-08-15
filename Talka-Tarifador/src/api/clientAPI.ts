@@ -97,8 +97,8 @@ class ClientAPI {
           is_active: true,
           created_by: currentAdminId,
           product_id: product.id,
-          color: data.color || null,
-          logo_url: data.logo_url || null
+          // color: data.color || null,
+          // logo_url: data.logo_url || null
         })
         .select()
         .single()

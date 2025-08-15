@@ -68,7 +68,8 @@ export function AppSidebar() {
   // White label: cor e logo do cliente
   const clientColor = !isAdmin && client?.color ? client.color : undefined;
   const clientLogo = !isAdmin && client?.logo_url ? client.logo_url : "/logo.png";
-  const clientName = !isAdmin && client?.name ? client.name : undefined;
+  // Nome da frente/produto para exibir no Sidebar
+  const productName = !isAdmin && client && (client as any).product_name ? (client as any).product_name : undefined;
 
   if (!isAdmin && clientLoading) {
     // Show skeleton or nothing while loading client data
@@ -91,14 +92,14 @@ export function AppSidebar() {
           <div className="h-10 w-10 flex items-center justify-center">
             <img 
               src={clientLogo} 
-              alt={clientName ? `Logo ${clientName}` : "Talka Logo"} 
+              alt={productName ? `Logo ${productName}` : "Talka Logo"} 
               className="h-10 w-10 object-contain rounded-xl"
             />
           </div>
           {!collapsed && (
             <div className="flex-1">
               <h1 className="font-bold text-lg bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                Tarifador{clientName ? ` ${clientName}` : ' Talka'}
+                Tarifador{productName ? ` ${productName}` : ' Talka'}
               </h1>
             </div>
           )}
