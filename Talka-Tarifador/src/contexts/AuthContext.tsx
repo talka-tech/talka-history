@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(response.user)
         localStorage.setItem('talka-user', JSON.stringify(response.user))
         apiClient.setToken(response.token)
+        // Dispara evento para atualizar contexto do cliente
+        window.dispatchEvent(new Event('clientDataUpdated'));
         setIsLoading(false)
         return true
       }
@@ -53,9 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
-    setUser(null)
-    localStorage.removeItem('talka-user')
-    apiClient.removeToken()
+  setUser(null)
+  localStorage.removeItem('talka-user')
+  apiClient.removeToken()
+  // Dispara evento para atualizar contexto do cliente
+  window.dispatchEvent(new Event('clientDataUpdated'));
   }
 
   const isAdmin = user?.role === 'admin'
