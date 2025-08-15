@@ -25,7 +25,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="min-h-screen" style={{ background: `linear-gradient(135deg, ${clientColor}0A 0%, #fff 100%)` }}>
+      <div className="min-h-screen" style={{ background: '#151518' }}>
         <div className="container mx-auto p-6 space-y-8">
           {/* Header */}
           <div className="space-y-2">

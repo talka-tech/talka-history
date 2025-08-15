@@ -19,7 +19,7 @@ export function ConsumptionChart({ data, cardColor }: ConsumptionChartProps) {
       return (
         <div className="rounded-lg border border-card-border bg-card p-3 shadow-elegant">
           <p className="text-sm font-medium text-foreground">{data?.date}</p>
-          <p className="text-sm text-accent">
+          <p className="text-sm" style={cardColor ? { color: cardColor.replace('10', '') } : { color: '#3f3f46' }}>
             <span className="font-medium">{payload[0]?.value}</span> créditos
           </p>
         </div>
@@ -40,7 +40,7 @@ export function ConsumptionChart({ data, cardColor }: ConsumptionChartProps) {
         <CardTitle className="text-lg font-semibold text-foreground">
           Consumo Diário - {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm" style={{ color: '#e4e4e7' }}>
           Créditos consumidos por dia neste mês
         </p>
       </CardHeader>
@@ -50,18 +50,17 @@ export function ConsumptionChart({ data, cardColor }: ConsumptionChartProps) {
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid 
                 strokeDasharray="3 3" 
-                stroke="hsl(var(--border))" 
-                opacity={0.3}
+                stroke="#a1a1aa"
               />
               <XAxis 
                 dataKey="day" 
-                stroke="hsl(var(--muted-foreground))"
+                stroke="#a1a1aa"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis 
-                stroke="hsl(var(--muted-foreground))"
+                stroke="#a1a1aa"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}

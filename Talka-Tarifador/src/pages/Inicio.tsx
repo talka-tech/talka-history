@@ -1,5 +1,5 @@
 import { Clock, CreditCard, TrendingUp, Users } from "lucide-react"
-import { MetricCard } from "@/components/dashboard/MetricCard"
+import MetricCard from "@/components/dashboard/MetricCard"
 import { ProgressCard } from "@/components/dashboard/ProgressCard"
 import { AlertCard } from "@/components/dashboard/AlertCard"
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart"
@@ -49,12 +49,12 @@ export default function Inicio() {
           <div className="space-y-2">
             <h1
               className="text-3xl font-bold"
-              style={client.color ? { color: client.color } : {}}
+              style={{ color: client.color || '#3f3f46' }}
             >
               Início
             </h1>
-            <p className="text-muted-foreground">
-              Bem-vindo ao painel de controle do <span style={client.color ? { color: client.color } : {}}>{client.name}</span>
+            <p className="text-muted-foreground" style={{ color: '#d4d4d8' }}>
+              Bem-vindo ao painel de controle do <span style={{ color: client.color || '#3f3f46' }}>{client.name}</span>
             </p>
           </div>
 

@@ -29,8 +29,8 @@ export function Layout({ children }: LayoutProps) {
         <AppSidebar />
         <div className="flex-1 flex flex-col">
           <header
-            className="h-16 border-b border-card-border/50 flex items-center px-6 shadow-sm"
-            style={Object.assign({ background: '#151518' }, clientColor ? { ['--icon-color']: clientColor } : {})}
+            className="h-16 border-b border-zinc-700/70 flex items-center px-6 shadow-sm"
+            style={Object.assign({ background: '#151518', borderBottomColor: '#3f3f46' }, clientColor ? { ['--icon-color']: clientColor } : {})}
           >
             <Button
               variant="ghost"

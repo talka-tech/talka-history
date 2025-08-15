@@ -73,8 +73,8 @@ export function AppSidebar() {
   if (!isAdmin && clientLoading) {
     // Show skeleton or nothing while loading client data
     return (
-      <Sidebar className="border-card-border bg-card/50 backdrop-blur-sm">
-        <SidebarHeader className="border-b border-card-border/50 p-4">
+      <Sidebar className="border-zinc-700 bg-card/50 backdrop-blur-sm">
+        <SidebarHeader className="border-b border-zinc-700/70 p-4">
           <div className="flex items-center gap-3 animate-pulse">
             <div className="h-10 w-10 bg-muted rounded-xl" />
             {!collapsed && <div className="h-6 w-32 bg-muted rounded" />}
@@ -85,8 +85,8 @@ export function AppSidebar() {
   }
 
   return (
-  <Sidebar className="border-card-border bg-card/50 backdrop-blur-sm">
-      <SidebarHeader className="border-b border-card-border/50 p-4">
+  <Sidebar className="border-zinc-700 bg-card/50 backdrop-blur-sm">
+      <SidebarHeader className="border-b border-zinc-700/70 p-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 flex items-center justify-center">
             <img 
@@ -116,7 +116,7 @@ export function AppSidebar() {
               </p>
             </div>
             <p className="text-sm font-semibold text-foreground truncate">{getDisplayName()}</p>
-            <p className="text-xs text-muted-foreground truncate">Empresa</p>
+            <p className="text-xs font-semibold truncate" style={clientColor ? { color: clientColor } : {}}>Empresa</p>
             {isAdmin && (
               <div className="mt-2">
                 <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200">
@@ -137,13 +137,16 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      className={({ isActive }) =>
-                        `flex items-center ${collapsed ? 'justify-center px-3' : 'gap-3 px-4'} py-3 rounded-xl transition-all duration-200 group relative ${
-                          isActive 
-                            ? (clientColor ? `bg-[${clientColor}]/20 text-[${clientColor}] font-semibold shadow-sm border border-[${clientColor}]/20` : "font-semibold shadow-sm border border-accent/20")
-                            : (clientColor ? `text-[${clientColor}] hover:text-foreground hover:bg-[${clientColor}]/10 hover:shadow-sm` : "text-muted-foreground hover:text-foreground hover:bg-accent/5 hover:shadow-sm")
-                        }`
-                      }
+                      className={({ isActive }) => {
+                        // Sempre aplica border-zinc-700, mesmo com clientColor
+                        const base = `flex items-center ${collapsed ? 'justify-center px-3' : 'gap-3 px-4'} py-3 rounded-xl transition-all duration-200 group relative border border-zinc-700`;
+                        if (isActive) {
+                          return base + (clientColor ? ` bg-[${clientColor}]/20 text-[${clientColor}] font-semibold shadow-sm` : " font-semibold shadow-sm");
+                        } else {
+                          return base + (clientColor ? ` text-[${clientColor}] hover:text-foreground hover:bg-[${clientColor}]/10 hover:shadow-sm` : " text-muted-foreground hover:text-foreground hover:bg-accent/5 hover:shadow-sm");
+                        }
+                      }}
+                      style={{ borderColor: '#3f3f46' }}
                     >
                       {({ isActive }) => (
                         <>
@@ -178,28 +181,33 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className="mt-auto p-4 border-t border-card-border/50">
+  <div className="mt-auto p-4 border-t border-zinc-700/70">
         {/* Logout Button */}
         {!collapsed && (
           <Button
             variant="ghost"
             size="sm"
             onClick={logout}
-            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            className="w-full justify-start gap-2 transition-colors"
+            style={clientColor ? { color: clientColor, borderColor: clientColor } : {}}
+            onMouseOver={e => { if (clientColor) e.currentTarget.style.background = clientColor + '10'; }}
+            onMouseOut={e => { if (clientColor) e.currentTarget.style.background = 'transparent'; }}
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4" style={clientColor ? { color: clientColor } : {}} />
             Sair
           </Button>
         )}
-        
         {collapsed && (
           <Button
             variant="ghost"
             size="sm"
             onClick={logout}
-            className="w-full justify-center text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            className="w-full justify-center transition-colors"
+            style={clientColor ? { color: clientColor, borderColor: clientColor } : {}}
+            onMouseOver={e => { if (clientColor) e.currentTarget.style.background = clientColor + '10'; }}
+            onMouseOut={e => { if (clientColor) e.currentTarget.style.background = 'transparent'; }}
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4" style={clientColor ? { color: clientColor } : {}} />
           </Button>
         )}
       </div>

@@ -66,7 +66,7 @@ export function ProgressCard({
       style={cardColor ? { background: bg, borderColor: border } : {}}
     >
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium" style={title === 'Consumo Mensal' ? { color: '#e4e4e7' } : {}}>
           {title}
         </CardTitle>
       </CardHeader>
@@ -76,14 +76,14 @@ export function ProgressCard({
             <span className="text-2xl font-bold text-foreground">
               {current.toLocaleString('pt-BR')}
             </span>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm" style={cardColor ? { color: cardColor.replace('10', '') } : { color: '#3f3f46' }}>
               / {total.toLocaleString('pt-BR')} {unit}
             </span>
           </div>
           
           <Progress 
             value={percentage} 
-            className={`h-2 [&>div]:${progressVariants[currentVariant]}`}
+            className="h-2 bg-[#18181b] [&>div]:bg-[#18181b]"
           />
           
           {showPercentage && (
@@ -95,7 +95,7 @@ export function ProgressCard({
               )}>
                 {percentage}% utilizado
               </span>
-              <span className="text-muted-foreground">
+              <span style={{ color: '#e4e4e7' }}>
                 {(total - current).toLocaleString('pt-BR')} restantes
               </span>
             </div>

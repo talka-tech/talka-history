@@ -69,7 +69,7 @@ export function AlertCard({ type, percentage, clientType, onUpgrade }: AlertCard
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
           <Icon className={cn("h-5 w-5", iconStyles[config.variant])} />
-          <h3 className="font-semibold text-foreground">{config.title}</h3>
+          <h3 className="font-semibold" style={clientColor ? { color: clientColor.trim() } : { color: '#3f3f46' }}>{config.title}</h3>
         </div>
       </CardHeader>
       <CardContent>
