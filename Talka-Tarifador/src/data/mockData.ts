@@ -18,6 +18,7 @@ export interface ClientData {
   }>
   color?: string // Cor primária do cliente
   logo_url?: string // Logo do cliente
+  product_name?: string // Nome da frente/produto
 }
 
 // Generate mock monthly data for fallback
@@ -74,7 +75,8 @@ const convertClientData = (client: any): ClientData => {
     lastUsage: client.last_usage ? new Date(client.last_usage) : new Date(),
     monthlyConsumption: generateMockMonthlyData(client.credits_used),
     color: typeof product.color === 'string' ? product.color : undefined,
-    logo_url: product.logo_url || undefined
+    logo_url: product.logo_url || undefined,
+    product_name: (client.talka_products && client.talka_products.name) || client.product_name || product.name || undefined
   }
 }
 
