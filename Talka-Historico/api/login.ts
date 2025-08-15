@@ -15,8 +15,19 @@ export default async function handler(request: Request) {
     });
   }
 
+  let username: string | undefined;
+  let password: string | undefined;
   try {
-    const { username, password } = await request.json();
+    const body = await request.text();
+    try {
+      const json = JSON.parse(body);
+      username = json.username;
+      password = json.password;
+    } catch (parseErr) {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!username || !password) {
       return new Response(JSON.stringify({ error: 'Username and password are required' }), {
@@ -32,7 +43,9 @@ export default async function handler(request: Request) {
       .limit(1);
 
     if (error) {
-      throw error;
+      return new Response(JSON.stringify({ error: 'Database error', details: error.message }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     if (!users || users.length === 0) {
@@ -70,7 +83,8 @@ export default async function handler(request: Request) {
     });
 
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: 'Login failed', details: error.message }), {
+    // Garante resposta JSON válida mesmo em erro inesperado
+    return new Response(JSON.stringify({ error: 'Login failed', details: error?.message || String(error) }), {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }

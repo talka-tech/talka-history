@@ -37,6 +37,10 @@
     }
     ,
     {
+  "src": "/(.*)\\.(js|css|png|jpg|jpeg|svg|ico|json|txt|woff2|woff|ttf|map|webp|gif|mp4|mp3|ogg|wav|mjs|ts|tsx|wasm)$",
+  "dest": "/$1.$2"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
