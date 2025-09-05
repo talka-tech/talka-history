@@ -455,6 +455,31 @@ const AdminPanel = ({ onLogout, user }: AdminPanelProps) => {
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </Button>
+            
+            {/* Botão temporário para limpar dados RCWS incorretos */}
+            <Button
+              onClick={async () => {
+                if (confirm('⚠️ Isso vai remover todas as conversas RCWS incorretas. Continuar?')) {
+                  try {
+                    const response = await fetch('/api/clear-rcws-data', { method: 'POST' });
+                    const result = await response.json();
+                    if (result.success) {
+                      toast({ title: '✅ Dados RCWS limpos com sucesso!', description: `Removidas: ${result.removed?.conversations || 0} conversas` });
+                    } else {
+                      toast({ title: '❌ Erro ao limpar dados', variant: 'destructive' });
+                    }
+                  } catch (error) {
+                    toast({ title: '❌ Erro na requisição', variant: 'destructive' });
+                  }
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="text-red-400 hover:bg-red-900/50 hover:text-red-300 border-red-600/30 hover:border-red-500/50 transition-colors"
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Limpar RCWS
+            </Button>
           </div>
         </div>
 

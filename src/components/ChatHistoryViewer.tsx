@@ -225,7 +225,7 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       console.log('🗑️ Iniciando limpeza de dados para usuário:', currentUserId);
       
       const response = await fetch('/api/clear-data-fk', {
-        method: 'DELETE',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -281,15 +281,11 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
     try {
       console.log('🗑️ Excluindo conversa:', conversationId);
       
-      const response = await fetch('/api/delete-conversation', {
+      const response = await fetch(`/api/delete-conversation?id=${conversationId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          conversationId,
-          userId: currentUserId
-        })
+        }
       });
 
       if (!response.ok) {
@@ -477,14 +473,32 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       }
 
       const headers = lines[0].toLowerCase();
-      const requiredColumns = ['chat_id', 'text', 'type'];
-      const missingColumns = requiredColumns.filter(col => !headers.includes(col));
       
-      if (missingColumns.length > 0) {
-        throw new Error(`Colunas obrigatórias ausentes no CSV: ${missingColumns.join(', ')}. Verifique se o arquivo tem as colunas corretas.`);
+      // Detecta automaticamente o tipo de CSV baseado nas colunas
+      const hasWrlHeaders = headers.includes('chat_id') && 
+                           headers.includes('mobile_number') && 
+                           headers.includes('fromme') &&
+                           headers.includes('direction');
+      
+      const hasRcwsHeaders = headers.includes('_id') && 
+                            headers.includes('chat') && 
+                            headers.includes('is_out') &&
+                            headers.includes('wa_sender_id');
+      
+      if (!hasWrlHeaders && !hasRcwsHeaders) {
+        throw new Error(`Formato CSV não reconhecido. Esperado:
+        
+WRL Bonés: chat_id, mobile_number, fromMe, direction, text, type
+RCWS Advogados: _id, chat, is_out, wa_sender_id, text, type
+
+Colunas encontradas: ${headers}`);
       }
 
+      const csvTypeCode = hasWrlHeaders ? 'wrl' : 'rcws';
+      console.log(`🏷️  CSV detectado como: ${csvTypeCode} (code: ${csvTypeCode})`);
+      
       console.log('✅ Validação CSV aprovada:', {
+        csvTypeCode: csvTypeCode,
         totalLines: lines.length,
         headers: headers,
         dataLines: lines.length - 1
@@ -516,7 +530,8 @@ const ChatHistoryViewer = ({ onLogout, currentUser, currentUserId }: ChatHistory
       const result = await autoUploader.current.handleFileUpload(
         validatedFile, 
         progressCallback, 
-        currentUserId
+        currentUserId,
+        csvTypeCode
       );
 
       console.log('🎉 Upload concluído com sucesso:', result);
